@@ -48,7 +48,12 @@
           <form id="occurrenceForm">
             <input id="occId" placeholder="ID" />
             <input id="occLocation" placeholder="Localização" />
-            <input id="occNeighborhood" placeholder="Bairro" />
+            <select id="occType">
+              <option value="Acidente">Acidente</option>
+              <option value="MalSubito">Mal súbito</option>
+              <option value="Trauma">Trauma</option>
+              <option value="Outro">Outro</option>
+            </select>
             <select id="occSeverity">
               <option value="Alta">Alta</option>
               <option value="Media">Média</option>
@@ -62,6 +67,8 @@
               <option value="Concluida">Concluída</option>
               <option value="Cancelada">Cancelada</option>
             </select>
+            <textarea id="occNotes" placeholder="Observações"></textarea>
+            <input id="occNodeId" type="hidden" />
             <button type="submit">Salvar</button>
             <div id="occurrenceError" class="error"></div>
           </form>
@@ -69,6 +76,10 @@
         <div class="card">
           <h3>Lista</h3>
           <table class="table" id="occurrenceTable"></table>
+        </div>
+        <div class="card">
+          <h3>Mapa de bairros</h3>
+          <canvas id="graphCanvas" width="1000" height="600"></canvas>
         </div>
       </div>
     </div>

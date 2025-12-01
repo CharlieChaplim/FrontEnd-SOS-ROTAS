@@ -10,7 +10,8 @@
     logoutBtn.addEventListener('click',()=>{ location.href = 'index.html' })
   }
 
-  if(page === 'dashboard') initDashboard()
+  if(page === 'dashboard' || page === 'occurrences') initDashboard()
+  if(page === 'occurrences') initOccurrencesUI()
 
   function initDashboard(){
     const canvas = document.getElementById('graphCanvas')
@@ -127,6 +128,20 @@
       const n = findNode(wx,wy)
       if(n) {
         handleOccurrence(n)
+        if(page==='occurrences'){
+          const occNeighborhood = document.getElementById('occNeighborhood')
+          const occLocation = document.getElementById('occLocation')
+          const occNodeId = document.getElementById('occNodeId')
+          const occDateTime = document.getElementById('occDateTime')
+          if(occNeighborhood) occNeighborhood.value = n.name
+          if(occLocation) occLocation.value = n.name
+          if(occNodeId) occNodeId.value = n.id
+          if(occDateTime && !occDateTime.value){
+            const now = new Date();
+            const tz = new Date(now.getTime()-now.getTimezoneOffset()*60000)
+            occDateTime.value = tz.toISOString().slice(0,16)
+          }
+        }
       }
     })
 
@@ -434,10 +449,74 @@
     window._bases = bases
 
   }
+  function initOccurrencesUI(){
+    const form = document.getElementById('occurrenceForm')
+    const table = document.getElementById('occurrenceTable')
+    const severitySel = document.getElementById('filterOccSeverity')
+    const neighInp = document.getElementById('filterOccNeighborhood')
+    const statusSel = document.getElementById('filterOccStatus')
+    const dt = document.getElementById('occDateTime')
+    if(dt && !dt.value){
+      const now = new Date();
+      const tz = new Date(now.getTime()-now.getTimezoneOffset()*60000)
+      dt.value = tz.toISOString().slice(0,16)
+    }
+    function read(){
+      try{ return JSON.parse(localStorage.getItem('occurrences')||'[]') }catch(e){ return [] }
+    }
+    function write(list){ localStorage.setItem('occurrences', JSON.stringify(list)) }
+    function render(){
+      const all = read()
+      const s = severitySel && severitySel.value ? severitySel.value : ''
+      const n = neighInp && neighInp.value ? neighInp.value.toLowerCase() : ''
+      const st = statusSel && statusSel.value ? statusSel.value : ''
+      const rows = all.filter(o=>(!s||o.severity===s)&&(!st||o.status===st)&&(!n||String(o.neighborhood||'').toLowerCase().includes(n)))
+      const header = '<tr><th>ID</th><th>Bairro</th><th>Tipo</th><th>Severidade</th><th>Status</th><th>Data/Hora</th></tr>'
+      const body = rows.map(o=>`<tr><td>${o.id||''}</td><td>${o.neighborhood||''}</td><td>${o.type||''}</td><td>${o.severity||''}</td><td>${o.status||''}</td><td>${o.dateTime||''}</td></tr>`).join('')
+      if(table) table.innerHTML = header+body
+    }
+    function toast(msg){
+      const t = document.getElementById('toast')
+      if(!t) return
+      t.textContent = msg
+      t.hidden = false
+      setTimeout(()=>{ t.hidden = true }, 1800)
+    }
+    if(form){
+      form.addEventListener('submit',e=>{
+        e.preventDefault()
+        const err = document.getElementById('occurrenceError')
+        const id = document.getElementById('occId')?.value||''
+        const loc = document.getElementById('occLocation')?.value||''
+        const neigh = document.getElementById('occNeighborhood')?.value||''
+        const type = document.getElementById('occType')?.value||''
+        const severity = document.getElementById('occSeverity')?.value||''
+        const dateTime = document.getElementById('occDateTime')?.value||''
+        const status = document.getElementById('occStatus')?.value||''
+        const notes = document.getElementById('occNotes')?.value||''
+        if(!neigh){ if(err) err.textContent = 'Selecione um bairro no mapa.'; return }
+        if(err) err.textContent = ''
+        const list = read()
+        list.push({id, location:loc, neighborhood:neigh, type, severity, dateTime, status, notes})
+        write(list)
+        render()
+        toast('Ocorrência salva')
+        form.reset()
+      })
+    }
+    ;['change','input'].forEach(ev=>{
+      if(severitySel) severitySel.addEventListener(ev,render)
+      if(neighInp) neighInp.addEventListener(ev,render)
+      if(statusSel) statusSel.addEventListener(ev,render)
+    })
+    render()
+  }
 })();
 
-document.getElementById("loginForm").addEventListener("submit", function(e) {
-    e.preventDefault(); // Impede o reload
-
+var _lf = document.getElementById("loginForm")
+if(_lf){
+  _lf.addEventListener("submit", function(e) {
+    e.preventDefault();
     window.location.href = "dashboard.html";
-});
+  })
+}
