@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S.O.S. Rotas - Ocorrências</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="occurrences">
+  <header class="app-header">
+    <h1>S.O.S. Rotas</h1>
+    <nav class="nav">
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="ambulances.html">Ambulâncias</a>
+        <a href="occurrences.html">Ocorrências</a>
+        <a href="dispatch.html">Despacho</a>
+        <a href="history.html">Histórico</a>
+        <a href="professionals.html">Profissionais</a>
+        <button id="logoutBtn">Sair</button>
+      </div>
+    </nav>
+  </header>
+  <main class="view">
+    <div class="page">
+      <h2>Ocorrências</h2>
+      <div class="filters">
+        <select id="filterOccSeverity">
+          <option value="">Severidade</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Média</option>
+          <option value="Baixa">Baixa</option>
+        </select>
+        <input id="filterOccNeighborhood" placeholder="Bairro" />
+        <select id="filterOccStatus">
+          <option value="">Status</option>
+          <option value="Aberta">Aberta</option>
+          <option value="Despachada">Despachada</option>
+          <option value="EmAtendimento">Em atendimento</option>
+          <option value="Concluida">Concluída</option>
+          <option value="Cancelada">Cancelada</option>
+        </select>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Cadastro</h3>
+          <form id="occurrenceForm">
+            <input id="occId" placeholder="ID" />
+            <input id="occLocation" placeholder="Localização" />
+            <input id="occNeighborhood" placeholder="Bairro" />
+            <select id="occSeverity">
+              <option value="Alta">Alta</option>
+              <option value="Media">Média</option>
+              <option value="Baixa">Baixa</option>
+            </select>
+            <input id="occDateTime" type="datetime-local" />
+            <select id="occStatus">
+              <option value="Aberta">Aberta</option>
+              <option value="Despachada">Despachada</option>
+              <option value="EmAtendimento">Em atendimento</option>
+              <option value="Concluida">Concluída</option>
+              <option value="Cancelada">Cancelada</option>
+            </select>
+            <button type="submit">Salvar</button>
+            <div id="occurrenceError" class="error"></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Lista</h3>
+          <table class="table" id="occurrenceTable"></table>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>

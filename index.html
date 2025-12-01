@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S.O.S. Rotas - Login</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="login">
+  <header class="app-header">
+    <h1>S.O.S. Rotas</h1>
+    <nav class="nav">
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <div class="nav-links">
+        <a href="index.html">Entrar</a>
+        <div class="nav-auth" id="navAuth" hidden>
+          <a href="dashboard.html">Dashboard</a>
+          <a href="ambulances.html">Ambulâncias</a>
+          <a href="professionals.html">Profissionais</a>
+          <a href="occurrences.html">Ocorrências</a>
+          <a href="dispatch.html">Despacho</a>
+          <a href="history.html">Histórico</a>
+          <a href="analytics.html">Analytics</a>
+          <a href="map.html">Mapa</a>
+          <button id="logoutBtn">Sair</button>
+        </div>
+      </div>
+    </nav>
+  </header>
+  <main class="view">
+    <form id="loginForm" class="card">
+      <h2>Autenticação</h2>
+      <label>Usuário
+        <input type="text" id="loginUsername" autocomplete="username" />
+      </label>
+      <label>Senha
+        <input type="password" id="loginPassword" autocomplete="current-password" />
+      </label>
+      <button type="submit">Entrar</button>
+      <div id="loginError" class="error" role="alert"></div>
+    </form>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>

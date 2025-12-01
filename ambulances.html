@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S.O.S. Rotas - Ambulâncias</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="ambulances">
+  <header class="app-header">
+    <h1>S.O.S. Rotas</h1>
+    <nav class="nav">
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="ambulances.html">Ambulâncias</a>
+        <a href="occurrences.html">Ocorrências</a>
+        <a href="dispatch.html">Despacho</a>
+        <a href="history.html">Histórico</a>
+        <a href="professionals.html">Profissionais</a>
+        <button id="logoutBtn">Sair</button>
+      </div>
+    </nav>
+  </header>
+  <main class="view">
+    <div class="page">
+      <h2>Ambulâncias</h2>
+      <div class="filters">
+        <select id="filterAmbType">
+          <option value="">Tipo</option>
+          <option value="UTI">UTI</option>
+          <option value="Basica">Básica</option>
+        </select>
+        <select id="filterAmbBase"></select>
+        <select id="filterAmbShift">
+          <option value="">Turno</option>
+          <option value="dia">Dia</option>
+          <option value="noite">Noite</option>
+        </select>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Cadastro</h3>
+          <form id="ambulanceForm">
+            <label>Placa
+              <input id="ambPlate" placeholder="Placa" />
+            </label>
+            <label>Tipo
+              <select id="ambType">
+                <option value="UTI">UTI</option>
+                <option value="Basica">Básica</option>
+              </select>
+            </label>
+            <label>Base
+              <select id="ambBase"></select>
+            </label>
+            <label>Status
+              <select id="ambStatus">
+                <option value="Disponivel">Disponível</option>
+                <option value="EmAtendimento">Em atendimento</option>
+                <option value="Inativa">Inativa</option>
+              </select>
+            </label>
+            <button type="submit">Salvar</button>
+            <div id="ambulanceError" class="error"></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Equipe</h3>
+          <form id="teamForm">
+              <label>Turno
+              <select id="ambShift">
+                <option value="">Selecionar</option>
+                <option value="dia">Matutino</option>
+                <option value="dia">Vespertino</option>                
+                <option value="noite">Noturno</option>
+              </select>
+            </label>
+            <label>Ambulância
+              <select id="teamAmb"></select>
+            </label>
+            <label>Motorista
+              <input id="profDriver" placeholder="Motorista" />
+            </label>
+            <label>Enfermeiro(a)
+              <input id="profNurse" placeholder="Enfermeiro(a)" />
+            </label>
+            <label>Médico(a)
+              <input id="profDoctor" placeholder="Médico(a)" />
+            </label>
+            <button type="submit">Vincular equipe</button>
+            <div id="teamError" class="error"></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Lista</h3>
+          <table class="table" id="ambulanceTable"></table>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
