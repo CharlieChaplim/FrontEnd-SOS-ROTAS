@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S.O.S. Rotas - Bases</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="bases">
+  <header class="app-header">
+    <h1>S.O.S. Rotas</h1>
+    <nav class="nav">
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="ambulances.html">Ambulâncias</a>
+        <a href="occurrences.html">Ocorrências</a>
+        <a href="dispatch.html">Despacho</a>
+        <a href="history.html">Histórico</a>
+        <a href="professionals.html">Profissionais</a>
+        <a href="bases.html">Bases</a>
+        <button id="logoutBtn">Sair</button>
+      </div>
+    </nav>
+  </header>
+  <main class="view">
+    <div class="page">
+      <h2>Bases</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Cadastro</h3>
+          <form id="baseForm">
+            <label>Nome
+              <input id="baseName" placeholder="Nome da base" />
+            </label>
+            <label>Node ID
+              <input id="baseNodeId" type="number" placeholder="ID do nó" />
+            </label>
+            <label>Disponibilidade
+              <select id="baseAvailable">
+                <option value="true">Disponível</option>
+                <option value="false">Indisponível</option>
+              </select>
+            </label>
+            <button type="submit">Salvar</button>
+            <div id="baseError" class="error"></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Lista</h3>
+          <table class="table" id="baseTable"></table>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>

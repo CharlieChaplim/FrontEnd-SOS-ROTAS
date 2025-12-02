@@ -12,7 +12,23 @@
 
   if(page === 'dashboard' || page === 'occurrences') initDashboard()
   if(page === 'occurrences') initOccurrencesUI()
+  if(page === 'ambulances') initAmbulancesUI()
+  if(page === 'professionals') initProfessionalsUI()
+  if(page === 'bases') initBasesUI()
 
+  function readBases(){
+    try{
+      const s = localStorage.getItem('bases')
+      if(s) return JSON.parse(s)
+    }catch(e){}
+    return [
+      {nodeId: 2, available:true, name:'Base Centro'},
+      {nodeId: 11, available:true, name:'Base Nova Alvorada'}
+    ]
+  }
+  function writeBases(list){
+    localStorage.setItem('bases', JSON.stringify(list))
+  }
   function initDashboard(){
     const canvas = document.getElementById('graphCanvas')
     if(!canvas) return
@@ -47,11 +63,7 @@
     // ----- configurar bases / ambulâncias -----
     // ajuste aqui: ids das bases (vértices) e disponibilidade
     // Exemplo: base 2 (Centro) e base 11 (Nova Alvorada) têm ambulância disponível
-    const bases = [
-      {nodeId: 2, available:true, name:'Base Centro'},
-      {nodeId: 11, available:true, name:'Base Nova Alvorada'},
-      // adicione mais bases aqui se quiser
-    ]
+    const bases = readBases()
 
     // ----- criar nós e arestas -----
     const idToNode = new Map()
@@ -509,6 +521,75 @@
       if(neighInp) neighInp.addEventListener(ev,render)
       if(statusSel) statusSel.addEventListener(ev,render)
     })
+    render()
+  }
+  function populateBaseSelect(el, bases, emptyLabel){
+    if(!el) return
+    el.innerHTML = ''
+    if(emptyLabel){
+      const opt = document.createElement('option')
+      opt.value = ''
+      opt.textContent = emptyLabel
+      el.appendChild(opt)
+    }
+    bases.forEach(b=>{
+      const opt = document.createElement('option')
+      opt.value = String(b.nodeId)
+      opt.textContent = b.name
+      el.appendChild(opt)
+    })
+  }
+  function initAmbulancesUI(){
+    const bases = readBases()
+    const filterSel = document.getElementById('filterAmbBase')
+    const formSel = document.getElementById('ambBase')
+    populateBaseSelect(filterSel, bases, 'Base')
+    populateBaseSelect(formSel, bases, '')
+  }
+  function initProfessionalsUI(){
+    const bases = readBases()
+    const filterSel = document.getElementById('filterProfBase')
+    const formSel = document.getElementById('profBase')
+    populateBaseSelect(filterSel, bases, 'Base')
+    populateBaseSelect(formSel, bases, '')
+  }
+  function initBasesUI(){
+    const form = document.getElementById('baseForm')
+    const table = document.getElementById('baseTable')
+    function render(){
+      const bases = readBases()
+      const header = '<tr><th>Node ID</th><th>Nome</th><th>Disponível</th></tr>'
+      const body = bases.map(b=>`<tr><td>${b.nodeId}</td><td>${b.name}</td><td>${b.available?'Sim':'Não'}</td></tr>`).join('')
+      if(table) table.innerHTML = header+body
+    }
+    function toast(msg){
+      const t = document.getElementById('toast')
+      if(!t) return
+      t.textContent = msg
+      t.hidden = false
+      setTimeout(()=>{ t.hidden = true }, 1800)
+    }
+    if(form){
+      form.addEventListener('submit',e=>{
+        e.preventDefault()
+        const err = document.getElementById('baseError')
+        const name = document.getElementById('baseName')?.value||''
+        const nodeIdStr = document.getElementById('baseNodeId')?.value||''
+        const availableStr = document.getElementById('baseAvailable')?.value||'true'
+        const nodeId = Number(nodeIdStr)
+        const available = availableStr === 'true'
+        if(!name || !nodeId){ if(err) err.textContent = 'Preencha nome e Node ID.'; return }
+        if(err) err.textContent = ''
+        const list = readBases()
+        const idx = list.findIndex(b=>Number(b.nodeId)===nodeId)
+        const item = {nodeId, name, available}
+        if(idx>=0) list[idx] = item; else list.push(item)
+        writeBases(list)
+        render()
+        toast('Base salva')
+        form.reset()
+      })
+    }
     render()
   }
 })();
