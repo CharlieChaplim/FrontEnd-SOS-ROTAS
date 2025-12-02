@@ -36,11 +36,16 @@
       <label>Senha
         <input type="password" id="loginPassword" autocomplete="current-password" />
       </label>
-      <a href="/dashboard.html"> <button type="submit">Entrar </button> </a>
+      <a href="/dashboard.html"> <button type="submit" onclick="callbackDoLogin">Entrar </button> </a>
       <div id="loginError" class="error" role="alert"></div>
     </form>
     <div id="toast" class="toast" hidden></div>
   </main>
   <script src="script.js"></script>
 </body>
+<script>
+  function callbackDoLogin() {
+    
+  }
+</script>
 </html>
