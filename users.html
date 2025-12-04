@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>S.O.S. Rotas - Usuários</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-page="users">
+  <header class="app-header">
+    <h1>S.O.S. Rotas</h1>
+    <nav class="nav">
+      <button class="nav-toggle" id="navToggle">☰</button>
+      <div class="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="ambulances.html">Ambulâncias</a>
+        <a href="occurrences.html">Ocorrências</a>
+        <a href="dispatch.html">Despacho</a>
+        <a href="history.html">Histórico</a>
+        <a href="professionals.html">Profissionais</a>
+        <a href="bases.html">Bases</a>
+        <a href="teams.html">Equipes</a>
+        <a href="users.html">Usuários</a>
+        <button id="logoutBtn">Sair</button>
+      </div>
+    </nav>
+  </header>
+  <main class="view">
+    <div class="page">
+      <h2>Cadastro de usuários do sistema</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Cadastro</h3>
+          <form id="userForm">
+            <label>Login
+              <input id="userLogin" placeholder="Login" />
+            </label>
+            <label>Email
+              <input id="userEmail" type="email" placeholder="Email" />
+            </label>
+            <label>Senha
+              <input id="userPassword" type="password" placeholder="Senha" />
+            </label>
+            <label>Confirmar senha
+              <input id="userPasswordConfirm" type="password" placeholder="Confirmar senha" />
+            </label>
+            <button type="submit">Salvar</button>
+            <div id="userError" class="error"></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Lista</h3>
+          <table class="table" id="userTable"></table>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script src="script.js"></script>
+  <script>
+    (function(){
+      const form = document.getElementById('userForm')
+      const table = document.getElementById('userTable')
+      const list = []
+      function render(){
+        const header = '<tr><td>Login</td><td>Email</td><td>Ações</td></tr>'
+        const body = list.map((u,i)=>`<tr><td>${u.login}</td><td>${u.email}</td><td><button onclick="editUser(${i})">Editar</button> <button onclick="deleteUser(${i})">Excluir</button></td></tr>`).join('')
+        table.innerHTML = header + body
+      }
+      if(form){
+        form.addEventListener('submit',e=>{
+          e.preventDefault()
+          const err = document.getElementById('userError')
+          const login = document.getElementById('userLogin')?.value||''
+          const email = document.getElementById('userEmail')?.value||''
+          const pass = document.getElementById('userPassword')?.value||''
+          const conf = document.getElementById('userPasswordConfirm')?.value||''
+          if(!login || !email || !pass || !conf){ if(err) err.textContent = 'Preencha todos os campos.'; return }
+          if(pass !== conf){ if(err) err.textContent = 'As senhas não coincidem.'; return }
+          if(err) err.textContent = ''
+          list.push({login,email})
+          render()
+          form.reset()
+        })
+      }
+      render()
+    })()
+    function editUser(id){ alert('Editar usuário ' + id) }
+    function deleteUser(id){ alert('Excluir usuário ' + id) }
+  </script>
+</body>
+</html>

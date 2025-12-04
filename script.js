@@ -10,7 +10,7 @@
     logoutBtn.addEventListener('click',()=>{ location.href = 'index.html' })
   }
 
-  if(page === 'dashboard' || page === 'occurrences') initDashboard()
+  if(page === 'dashboard' || page === 'occurrences' || page === 'dispatch') initDashboard()
   if(page === 'occurrences') initOccurrencesUI()
   if(page === 'ambulances') initAmbulancesUI()
   if(page === 'professionals') initProfessionalsUI()

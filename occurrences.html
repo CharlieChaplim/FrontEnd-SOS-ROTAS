@@ -18,6 +18,9 @@
         <a href="dispatch.html">Despacho</a>
         <a href="history.html">Histórico</a>
         <a href="professionals.html">Profissionais</a>
+        <a href="bases.html">Bases</a>
+        <a href="teams.html">Equipes</a>
+        <a href="users.html">Usuários</a>
         <button id="logoutBtn">Sair</button>
       </div>
     </nav>
@@ -25,23 +28,6 @@
   <main class="view">
     <div class="page">
       <h2>Ocorrências</h2>
-      <div class="filters">
-        <select id="filterOccSeverity">
-          <option value="">Severidade</option>
-          <option value="Alta">Alta</option>
-          <option value="Media">Média</option>
-          <option value="Baixa">Baixa</option>
-        </select>
-        <input id="filterOccNeighborhood" placeholder="Bairro" />
-        <select id="filterOccStatus">
-          <option value="">Status</option>
-          <option value="Aberta">Aberta</option>
-          <option value="Despachada">Despachada</option>
-          <option value="EmAtendimento">Em atendimento</option>
-          <option value="Concluida">Concluída</option>
-          <option value="Cancelada">Cancelada</option>
-        </select>
-      </div>
       <div class="grid">
         <div class="card">
           <h3>Cadastro</h3>
@@ -81,6 +67,23 @@
           <h3>Mapa de bairros</h3>
           <canvas id="graphCanvas" width="1000" height="600"></canvas>
         </div>
+      </div>
+      <div class="filters">
+        <select id="filterOccSeverity">
+          <option value="">Severidade</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Média</option>
+          <option value="Baixa">Baixa</option>
+        </select>
+        <input id="filterOccNeighborhood" placeholder="Bairro" />
+        <select id="filterOccStatus">
+          <option value="">Status</option>
+          <option value="Aberta">Aberta</option>
+          <option value="Despachada">Despachada</option>
+          <option value="EmAtendimento">Em atendimento</option>
+          <option value="Concluida">Concluída</option>
+          <option value="Cancelada">Cancelada</option>
+        </select>
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>
