@@ -9,39 +9,64 @@
 <body data-page="history">
   <header class="app-header">
     <h1>S.O.S. Rotas</h1>
-    <nav class="nav">
-      <button class="nav-toggle" id="navToggle">☰</button>
-      <div class="nav-links">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="ambulances.html">Ambulâncias</a>
-        <a href="occurrences.html">Ocorrências</a>
-        <a href="dispatch.html">Despacho</a>
-        <a href="history.html">Histórico</a>
-        <a href="professionals.html">Profissionais</a>
-        <a href="bases.html">Bases</a>
-        <a href="teams.html">Equipes</a>
-        <a href="users.html">Usuários</a>
-        <button id="logoutBtn">Sair</button>
-      </div>
-    </nav>
+    <div id="nav-placeholder"></div>
   </header>
-  <main class="view">
-    <div class="page">
-      <h2>Histórico de atendimentos</h2>
-      <div class="filters">
-        <select id="filterHistAmb"></select>
-        <input id="filterHistStart" type="datetime-local" />
-        <input id="filterHistEnd" type="datetime-local" />
-        <select id="filterHistSeverity">
-          <option value="">Severidade</option>
-          <option value="Alta">Alta</option>
-          <option value="Media">Média</option>
-          <option value="Baixa">Baixa</option>
-        </select>
+  <main class="view history-view">
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Histórico de Ocorrências</h2>
+          <p>Consulte os registros anteriores e acompanhe o status das ocorrências.</p>
+        </div>
       </div>
-      <table class="table" id="historyTable"></table>
-    </div>
-    <div id="toast" class="toast" hidden></div>
+      <form class="filter-bar" onsubmit="return false;">
+        <label>
+          Status
+          <select id="filterHistoryStatus">
+            <option value="">Todos</option>
+            <option value="Aberta">Aberta</option>
+            <option value="Despachada">Despachada</option>
+            <option value="Em atendimento">Em atendimento</option>
+            <option value="Concluída">Concluída</option>
+            <option value="Cancelada">Cancelada</option>
+          </select>
+        </label>
+        <label>
+          Gravidade
+          <select id="filterHistoryGravity">
+            <option value="">Todas</option>
+            <option value="Alta">Alta</option>
+            <option value="Media">Média</option>
+            <option value="Baixa">Baixa</option>
+          </select>
+        </label>
+        <label>
+          Bairro
+          <input type="text" id="filterHistoryNeighborhood" placeholder="Digite para filtrar" />
+        </label>
+      </form>
+      <div class="table-wrapper">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tipo</th>
+              <th>Gravidade</th>
+              <th>Bairro</th>
+              <th>Status</th>
+              <th>Data/Hora</th>
+              <th>SLA</th>
+              <th>Atendimentos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="8">Carregando histórico...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </main>
   <script src="script.js"></script>
 </body>

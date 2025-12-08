@@ -9,21 +9,7 @@
 <body data-page="bases">
   <header class="app-header">
     <h1>S.O.S. Rotas</h1>
-    <nav class="nav">
-      <button class="nav-toggle" id="navToggle">☰</button>
-      <div class="nav-links">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="ambulances.html">Ambulâncias</a>
-        <a href="occurrences.html">Ocorrências</a>
-        <a href="dispatch.html">Despacho</a>
-        <a href="history.html">Histórico</a>
-        <a href="professionals.html">Profissionais</a>
-        <a href="bases.html">Bases</a>
-        <a href="teams.html">Equipes</a>
-        <a href="users.html">Usuários</a>
-        <button id="logoutBtn">Sair</button>
-      </div>
-    </nav>
+    <div id="nav-placeholder"></div>
   </header>
   <main class="view">
     <div class="page">
@@ -31,18 +17,17 @@
       <div class="grid">
         <div class="card">
           <h3>Cadastro</h3>
-          <form id="baseForm">
+          <form id="baseForm" style="justify-items: stretch; align-items: end;">
             <label>Nome
               <input id="baseName" placeholder="Nome da base" />
             </label>
-            <label>Node ID
-              <input id="baseNodeId" type="number" placeholder="ID do nó" />
-            </label>
-            <label>Disponibilidade
-              <select id="baseAvailable">
-                <option value="true">Disponível</option>
-                <option value="false">Indisponível</option>
+            <label>Bairro
+              <select id="baseNodeId">
+                <option value="">Selecione o bairro</option>
               </select>
+            </label>
+            <label>Endereço
+              <input id="baseAddress" placeholder="Endereço da base" />
             </label>
             <button type="submit">Salvar</button>
             <div id="baseError" class="error"></div>
@@ -56,6 +41,30 @@
     </div>
     <div id="toast" class="toast" hidden></div>
   </main>
+  <div id="baseConfirmModal" class="modal-overlay" hidden style="width: 100%;height: 100%;position: fixed;top: 0;left: 0;display: flex;justify-content: center;align-items: center;background: rgba(0, 0, 0, 0.31);backdrop-filter: blur(2px);">
+    <div class="modal-card" style="background: white;border-radius: 1em;padding: 1em 2em;fill-opacity: initial;border: 2px solid rgb(211, 47, 47);box-shadow: 0 0.5em 2em 0.3em #460000;">
+      <h3>Confirmar criação</h3>
+      <p>As bases não são deletáveis. Verifique os dados antes de prosseguir.</p>
+      <dl>
+        <div>
+          <dt>Nome</dt>
+          <dd id="confirmBaseName"></dd>
+        </div>
+        <div>
+          <dt>Bairro</dt>
+          <dd id="confirmBaseBairro"></dd>
+        </div>
+        <div>
+          <dt>Endereço</dt>
+          <dd id="confirmBaseEndereco"></dd>
+        </div>
+      </dl>
+      <div class="modal-actions">
+        <button type="button" data-modal-action="cancel">Cancelar</button>
+        <button type="submit" data-modal-action="confirm" class="forced-red-button">Confirmar</button>
+      </div>
+    </div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>

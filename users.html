@@ -9,21 +9,7 @@
 <body data-page="users">
   <header class="app-header">
     <h1>S.O.S. Rotas</h1>
-    <nav class="nav">
-      <button class="nav-toggle" id="navToggle">☰</button>
-      <div class="nav-links">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="ambulances.html">Ambulâncias</a>
-        <a href="occurrences.html">Ocorrências</a>
-        <a href="dispatch.html">Despacho</a>
-        <a href="history.html">Histórico</a>
-        <a href="professionals.html">Profissionais</a>
-        <a href="bases.html">Bases</a>
-        <a href="teams.html">Equipes</a>
-        <a href="users.html">Usuários</a>
-        <button id="logoutBtn">Sair</button>
-      </div>
-    </nav>
+    <div id="nav-placeholder"></div>
   </header>
   <main class="view">
     <div class="page">
@@ -35,8 +21,11 @@
             <label>Login
               <input id="userLogin" placeholder="Login" />
             </label>
-            <label>Email
-              <input id="userEmail" type="email" placeholder="Email" />
+            <label>Tipo
+              <select id="useProfile">
+                <option value="2">Operador</option>
+                <option value="1">Administrador</option>
+              </select>
             </label>
             <label>Senha
               <input id="userPassword" type="password" placeholder="Senha" />
@@ -44,7 +33,7 @@
             <label>Confirmar senha
               <input id="userPasswordConfirm" type="password" placeholder="Confirmar senha" />
             </label>
-            <button type="submit">Salvar</button>
+            <button type="submit">Cadastrar</button>
             <div id="userError" class="error"></div>
           </form>
         </div>
@@ -55,38 +44,211 @@
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>
+    <div id="editModal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:1000">
+      <div class="card" style="max-width:420px;width:90%">
+        <h3>Editar usuário</h3>
+        <form id="editForm">
+          <label>Login
+            <input id="editLogin" placeholder="Login" />
+          </label>
+          <label>Tipo
+            <select id="editTipo">
+              <option value="2">Operador</option>
+              <option value="1">Administrador</option>
+            </select>
+          </label>
+          <label>Senha
+            <input id="editPassword" type="password" placeholder="Nova senha" />
+          </label>
+          <label style="display:flex;align-items:center;gap:8px">Ativo
+            <input id="editActive" type="checkbox" />
+          </label>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="submit">Salvar</button>
+            <button type="button" id="editCancel">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </main>
   <script src="script.js"></script>
+  <style>
+    #editModal:not([hidden]) {
+      display: flex !important;
+    }
+  </style>
   <script>
-    (function(){
-      const form = document.getElementById('userForm')
-      const table = document.getElementById('userTable')
-      const list = []
-      function render(){
-        const header = '<tr><td>Login</td><td>Email</td><td>Ações</td></tr>'
-        const body = list.map((u,i)=>`<tr><td>${u.login}</td><td>${u.email}</td><td><button onclick="editUser(${i})">Editar</button> <button onclick="deleteUser(${i})">Excluir</button></td></tr>`).join('')
+    
+    (async function(){
+        const authToken = localStorage.getItem('authToken') || ''
+        const usuarioLogin = localStorage.getItem('userLogin') || ''
+        const API_URL = 'http://localhost:8080/api'
+        const form = document.getElementById('userForm')
+        const table = document.getElementById('userTable')
+        let userList = []
+        
+        async function updateUserList() {
+            const usuariosReq = await fetch(
+            `${API_URL}/usuarios/listar-funcionarios`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': 'http://localhost:8080'
+              },
+              body: JSON.stringify({
+                login: usuarioLogin,
+                token: authToken
+              })
+            }
+          )
+
+          const usuariosResp = await usuariosReq.json()
+          userList = usuariosResp
+            .filter(u => u.login !== usuarioLogin)
+            .map(u => ({
+              login: u.login,
+              tipo: u.perfilNome,
+              tipoId: u.perfilId ?? u.perfil?.id ?? (u.perfilNome === 'Admin' ? 1 : 2),
+              ativo: Boolean(u.ativo),
+              id: u.id
+            })) || []
+        }
+
+    
+      async function render(){
+        await updateUserList()
+        const header = '<tr><td>Login</td><td>Tipo</td><td>Ações</td></tr>'
+        const body = userList.map((u,i)=>`<tr><td>${u.login}</td><td>${u.tipo}</td><td><button class="icon-button" title="Editar" onclick="editUser(${i})">✏️</button></td></tr>`).join('')
         table.innerHTML = header + body
       }
+
+      
+      // Registro de novo usuário
       if(form){
-        form.addEventListener('submit',e=>{
+        form.addEventListener('submit',async e=>{
           e.preventDefault()
           const err = document.getElementById('userError')
           const login = document.getElementById('userLogin')?.value||''
-          const email = document.getElementById('userEmail')?.value||''
+          const tipo = document.getElementById('useProfile')?.value||''
           const pass = document.getElementById('userPassword')?.value||''
           const conf = document.getElementById('userPasswordConfirm')?.value||''
-          if(!login || !email || !pass || !conf){ if(err) err.textContent = 'Preencha todos os campos.'; return }
+          if(!login || !tipo || !pass || !conf){ if(err) err.textContent = 'Preencha todos os campos.'; return }
           if(pass !== conf){ if(err) err.textContent = 'As senhas não coincidem.'; return }
           if(err) err.textContent = ''
-          list.push({login,email})
+
+          const novoUsuarioResp = await fetch(
+            `${API_URL}/usuarios/registrar`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': 'http://localhost:8080'
+              },
+              body: JSON.stringify({
+                token: authToken,
+                loginAutor: usuarioLogin,
+                login: login,
+                senha: pass,
+                perfilId: parseInt(tipo,10)
+              })
+            }
+          )
+          if (novoUsuarioResp.status !== 201) {
+            const novoUsuarioData = await novoUsuarioResp.json()
+            if(err) err.textContent = novoUsuarioData.mensagem|| 'Erro ao registrar usuário.'
+            return
+          } else {
+
+          }
+
           render()
           form.reset()
         })
       }
+
+
+      const modal = document.getElementById('editModal')
+      const editForm = document.getElementById('editForm')
+      const editLogin = document.getElementById('editLogin')
+      const editPassword = document.getElementById('editPassword')
+      const editActive = document.getElementById('editActive')
+      const editTipo = document.getElementById('editTipo')
+      const editCancel = document.getElementById('editCancel')
+      let editIndex = -1
+      window.editUser = function(id){
+        editIndex = id
+        const u = userList[id]
+        console.log('Editando usuário:', u)
+        if(!u) return
+        if(editLogin) editLogin.value = u.login || ''
+        if(editActive)
+          editActive.checked = u.ativo === true
+    
+        if(editPassword) editPassword.value = ''
+        if(editTipo) editTipo.value = u.tipoId ? String(u.tipoId) : (u.tipo === 'Administrador' ? '1' : '2')
+        if(modal) modal.hidden = false
+      }
+      if(editCancel){
+        editCancel.addEventListener('click',()=>{
+          if(modal) modal.hidden = true
+          editIndex = -1
+        })
+      }
+      if(editForm){
+        editForm.addEventListener('submit',async e=>{
+          e.preventDefault()
+          if(editIndex < 0) return
+          const u = userList[editIndex]
+          
+          const payload = {
+            adminToken: authToken,
+            adminLogin: usuarioLogin,
+            usuarioId: u.id,
+            usuarioAtivo: editActive ? editActive.checked : false
+          }
+          
+          const novoLogin = editLogin?.value
+          if(novoLogin && novoLogin !== u.login) {
+            payload.usuarioLogin = novoLogin
+          }
+          
+          const novaSenha = editPassword?.value
+          if(novaSenha) {
+            payload.usuarioSenha = novaSenha
+          }
+          
+          const novoTipo = editTipo?.value
+          if(novoTipo && novoTipo !== u.tipoId) {
+            payload.usuarioPerfilId = parseInt(novoTipo, 10)
+          }
+          
+          const editResp = await fetch(
+            `${API_URL}/usuarios/editar-usuario`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': 'http://localhost:8080'
+              },
+              body: JSON.stringify(payload)
+            }
+          )
+          
+          if(editResp.status !== 200) {
+            const errData = await editResp.json()
+            alert(errData.mensagem || 'Erro ao editar usuário.')
+            return
+          }
+          
+          if(payload.usuarioLogin) u.login = payload.usuarioLogin
+          if(payload.usuarioPerfilId) u.tipoId = payload.usuarioPerfilId
+          u.ativo = payload.usuarioAtivo
+          
+          render()
+          if(modal) modal.hidden = true
+          editIndex = -1
+        })
+      }
       render()
     })()
-    function editUser(id){ alert('Editar usuário ' + id) }
-    function deleteUser(id){ alert('Excluir usuário ' + id) }
   </script>
 </body>
 </html>

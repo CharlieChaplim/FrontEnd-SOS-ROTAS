@@ -9,27 +9,22 @@
 <body data-page="dashboard">
   <header class="app-header">
     <h1>S.O.S. Rotas</h1>
-    <nav class="nav">
-      <button class="nav-toggle" id="navToggle">☰</button>
-      <div class="nav-links">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="ambulances.html">Ambulâncias</a>
-        <a href="occurrences.html">Ocorrências</a>
-        <a href="dispatch.html">Despacho</a>
-        <a href="history.html">Histórico</a>
-        <a href="professionals.html">Profissionais</a>
-        <a href="bases.html">Bases</a>
-        <a href="teams.html">Equipes</a>
-        <a href="users.html">Usuários</a>
-        <button id="logoutBtn">Sair</button>
-      </div>
-    </nav>
+    <div id="nav-placeholder"></div>
   </header>
   <main class="view">
     <div class="grid">
       <div class="card">
-        <h3>Resumo</h3>
-        <div id="summary"></div>
+        <div class="card-header">
+          <div>
+            <h3>Resumo de Ocorrências</h3>
+            <p>Acompanhe rapidamente o histórico mais recente.</p>
+          </div>
+          <button class="btn ghost" id="refreshHistory" type="button">Atualizar</button>
+        </div>
+        <br>
+        <div id="summary" class="summary-list" aria-live="polite">
+          <p class="muted">Carregando ocorrências...</p>
+        </div>
       </div>
       <div class="card">
       <h3>Tempo médio de resposta</h3>
@@ -47,6 +42,17 @@
       <h3>Mapa de bairros</h3>
       <canvas id="graphCanvas" width="1000" height="600"></canvas>
     </div>
+    <dialog id="historyDetailModal" class="modal" aria-labelledby="historyDetailTitle">
+      <form method="dialog">
+        <header class="modal-header">
+          <h3 id="historyDetailTitle">Detalhes da ocorrência</h3>
+          <button type="submit" class="icon-button" title="Fechar">✕</button>
+        </header>
+        <div class="modal-body" id="historyDetailBody">
+          <p class="muted">Selecione uma ocorrência para ver os detalhes.</p>
+        </div>
+      </form>
+    </dialog>
     <div id="toast" class="toast" hidden></div>
   </main>
   <script src="script.js"></script>

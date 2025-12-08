@@ -9,21 +9,7 @@
 <body data-page="ambulances">
   <header class="app-header">
     <h1>S.O.S. Rotas</h1>
-    <nav class="nav">
-      <button class="nav-toggle" id="navToggle">☰</button>
-      <div class="nav-links">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="ambulances.html">Ambulâncias</a>
-        <a href="occurrences.html">Ocorrências</a>
-        <a href="dispatch.html">Despacho</a>
-        <a href="history.html">Histórico</a>
-        <a href="professionals.html">Profissionais</a>
-        <a href="bases.html">Bases</a>
-        <a href="teams.html">Equipes</a>
-        <a href="users.html">Usuários</a>
-        <button id="logoutBtn">Sair</button>
-      </div>
-    </nav>
+    <div id="nav-placeholder"></div>
   </header>
   <main class="view">
     <div class="page">
@@ -35,11 +21,6 @@
           <option value="Basica">Básica</option>
         </select>
         <select id="filterAmbBase"></select>
-        <select id="filterAmbShift">
-          <option value="">Turno</option>
-          <option value="dia">Dia</option>
-          <option value="noite">Noite</option>
-        </select>
       </div>
       <div class="grid">
         <div class="card">
@@ -76,7 +57,44 @@
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>
+    <div id="ambulanceEditModal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:1000">
+      <div class="card" style="max-width:420px;width:90%">
+        <h3>Editar Ambulância</h3>
+        <form id="ambulanceEditForm">
+          <label>Placa
+            <input id="editAmbPlate" placeholder="Placa" />
+          </label>
+          <label>Tipo
+            <select id="editAmbType">
+              <option value="UTI">UTI</option>
+              <option value="Basica">Básica</option>
+            </select>
+          </label>
+          <label>Base
+            <select id="editAmbBase"></select>
+          </label>
+          <label>Status
+            <select id="editAmbStatus">
+              <option value="Disponivel">Disponível</option>
+              <option value="EmAtendimento">Em atendimento</option>
+              <option value="EmManutencao">Em manutenção</option>                
+              <option value="Inativa">Inativa</option>
+            </select>
+          </label>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button type="submit">Salvar</button>
+            <button type="button" id="editAmbCancel">Cancelar</button>
+          </div>
+          <div id="ambulanceEditError" class="error"></div>
+        </form>
+      </div>
+    </div>
   </main>
   <script src="script.js"></script>
+  <style>
+    #ambulanceEditModal:not([hidden]) {
+      display: flex !important;
+    }
+  </style>
 </body>
 </html>

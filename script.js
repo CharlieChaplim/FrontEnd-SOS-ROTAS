@@ -1,68 +1,350 @@
 ;(function(){
   const page = document.body.dataset.page || ''
-  const nav = document.querySelector('.nav')
-  const navToggle = document.getElementById('navToggle')
-  const logoutBtn = document.getElementById('logoutBtn')
-  if(navToggle){
-    navToggle.addEventListener('click',()=>{ if(nav) nav.classList.toggle('open') })
+  const authToken = localStorage.getItem('authToken') || ''
+  const usuarioTipo = localStorage.getItem('userPerfilNome') || ''
+  const usuarioLogin = localStorage.getItem('userLogin') || ''
+
+  // bloqueia acesso às páginas internas sem token salvo
+  if(page !== 'login' && !authToken){  const authToken = localStorage.getItem('authToken') || ''
+  console.log('authToken?', authToken)
+  if (page !== 'login' && !authToken) { location.href = 'index.html'; return }
+    location.href = 'index.html'
+    return
   }
-  if(logoutBtn){
-    logoutBtn.addEventListener('click',()=>{ location.href = 'index.html' })
+
+  const paginasDoAdmin = ['bases', 'users', 'professionals', 'ambulances', 'teams']
+  if (usuarioTipo !== 'Admin' && paginasDoAdmin.includes(page)) {
+    alert('Acesso negado. Página restrita a administradores.')
+    location.href = 'dashboard.html'
+    return
   }
+
+  const API_URL = 'http://localhost:8080/api'
+
+  // Busca historico de ocorrencias reutilizavel entre dashboard e pagina dedicada
+  async function fetchHistoryRecords(){
+    try{
+      const resp = await fetch(`${API_URL}/ocorrencia/historico`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': 'http://localhost:8080'
+        },
+        body: JSON.stringify({
+          login: usuarioLogin,
+          token: authToken
+        })
+      })
+      if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+      const data = await resp.json()
+      if(!Array.isArray(data)) return []
+
+      return data.map(item => ({
+        id: item.ocorrenciaId || '',
+        type: item.tipoOcorrencia || '',
+        gravity: item.gravidade || '',
+        neighborhood: item.bairro || '',
+        status: item.status || '',
+        dateTime: item.dataHoraAbertura ? new Date(item.dataHoraAbertura).toLocaleString('pt-BR') : '',
+        rawDateTime: item.dataHoraAbertura || '',
+        observation: item.observacao || '',
+        slaViolation: item.infringiuSLA || '-',
+        attendances: Array.isArray(item.atendimentos) ? item.atendimentos : []
+      }))
+    }catch(err){
+      console.error('Erro ao buscar historico', err)
+      return []
+    }
+  }
+
+  async function loadNav(){
+    const mount = document.getElementById('nav-placeholder')
+    if(!mount) return
+    try{
+      const resp = await fetch('nav.html')
+      const html = await resp.text()
+      mount.innerHTML = html
+      initNavHandlers()
+      applyRoleVisibility()
+    }catch(err){
+      console.error('Falha ao carregar nav:', err)
+    }
+  }
+
+  function initNavHandlers(){
+    const nav = document.querySelector('.nav')
+    const navToggle = document.getElementById('navToggle')
+    const logoutBtn = document.getElementById('logoutBtn')
+    if(navToggle){
+      navToggle.addEventListener('click',()=>{ if(nav) nav.classList.toggle('open') })
+    }
+    if(logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        localStorage.clear()
+        sessionStorage.clear()
+        location.replace('index.html')
+      })
+    }
+  }
+
+  function applyRoleVisibility(){
+    const role = String(usuarioTipo || '').trim().toLowerCase()
+    const isAdmin = role === 'admin' || role === 'administrador'
+    const adminOnly = document.querySelectorAll('[data-role="admin"]')
+    adminOnly.forEach(el=>{
+      el.style.display = isAdmin ? '' : 'none'
+    })
+    
+    const hideForAdmin = document.querySelectorAll('[data-role="no-admin"]')
+    hideForAdmin.forEach(el=>{
+      el.style.display = isAdmin ? 'none' : ''
+    })
+  }
+
+  // Se voltar pelo histórico sem token, força redirecionar
+  window.addEventListener('pageshow', (event) => {
+    if (page === 'login') return;
+    const token = localStorage.getItem('authToken') || '';
+    if (!token) {
+      location.replace('index.html');
+    }
+  });
+
+  loadNav()
 
   if(page === 'dashboard' || page === 'occurrences' || page === 'dispatch') initDashboard()
   if(page === 'occurrences') initOccurrencesUI()
   if(page === 'ambulances') initAmbulancesUI()
   if(page === 'professionals') initProfessionalsUI()
   if(page === 'bases') initBasesUI()
+  if(page === 'dispatch') initDispatchUI()
+  if(page === 'teams') initTeamsUI()
+  if(page === 'history') initHistoryUI()
+  
+  function initHistoryUI(){
+    const table = document.getElementById('historyTable')
+    const filterStatus = document.getElementById('filterHistoryStatus')
+    const filterGravity = document.getElementById('filterHistoryGravity')
+    const filterNeighborhood = document.getElementById('filterHistoryNeighborhood')
+    
+    async function render(){
+      const all = await fetchHistoryRecords()
+      
+      const status = filterStatus?.value || ''
+      const gravity = filterGravity?.value || ''
+      const neighborhood = filterNeighborhood?.value || ''
+      
+      const filtered = all.filter(item => 
+        (!status || item.status === status) &&
+        (!gravity || item.gravity === gravity) &&
+        (!neighborhood || item.neighborhood.toLowerCase().includes(neighborhood.toLowerCase()))
+      )
+      
+      const header = '<thead><tr><th>ID</th><th>Tipo</th><th>Gravidade</th><th>Bairro</th><th>Status</th><th>Data/Hora</th><th>SLA</th><th>Atendimentos</th></tr></thead>'
+      const body = filtered.map(item => {
+        const slaClass = item.slaViolation === 'Infringiu' ? 'sla-violated' : ''
+        const attendanceCount = item.attendances.length
+        const attendanceInfo = attendanceCount > 0 
+          ? `${attendanceCount} atendimento(s)` 
+          : 'Sem atendimentos'
+        
+        return `<tr>
+          <td>${item.id}</td>
+          <td>${item.type}</td>
+          <td>${item.gravity}</td>
+          <td>${item.neighborhood}</td>
+          <td>${item.status}</td>
+          <td>${item.dateTime}</td>
+          <td class="${slaClass}">${item.slaViolation}</td>
+          <td>${attendanceInfo}</td>
+        </tr>`
+      }).join('')
+      
+      if(table) table.innerHTML = header + `<tbody>${body}</tbody>`
+    }
+    
+    // Event listeners para filtros
+    ;['change', 'input'].forEach(ev => {
+      if(filterStatus) filterStatus.addEventListener(ev, render)
+      if(filterGravity) filterGravity.addEventListener(ev, render)
+      if(filterNeighborhood) filterNeighborhood.addEventListener(ev, render)
+    })
+    
+    render()
+  }
+    
 
   function readBases(){
     try{
       const s = localStorage.getItem('bases')
       if(s) return JSON.parse(s)
     }catch(e){}
-    return [
-      {nodeId: 2, available:true, name:'Base Centro'},
-      {nodeId: 11, available:true, name:'Base Nova Alvorada'}
-    ]
+    return []
   }
   function writeBases(list){
     localStorage.setItem('bases', JSON.stringify(list))
   }
-  function initDashboard(){
+
+  async function fetchBairros(){
+    try{
+      const resp = await fetch(
+        `${API_URL}/localizacao/bairros`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        }
+      )
+      const data = await resp.json()
+      if(!Array.isArray(data)) return []
+      return data.map((bairro)=>({
+        id: Number(Object.keys(bairro)[0]),
+        name: bairro[Object.keys(bairro)[0]]
+      }))
+    }catch(err){
+      console.error('Erro ao carregar bairros', err)
+      return []
+    }
+  }
+
+  // MECHER
+  async function initDashboard(){
+    const summaryEl = document.getElementById('summary')
+    const refreshHistoryBtn = document.getElementById('refreshHistory')
+    const detailModal = document.getElementById('historyDetailModal')
+    const detailBody = document.getElementById('historyDetailBody')
+    let dashboardHistoryCache = []
+
+    function formatDateTime(value){
+      if(!value) return '-'
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pt-BR')
+    }
+
+    function renderHistorySummary(list){
+      if(!summaryEl) return
+      if(!list.length){
+        summaryEl.innerHTML = '<p class="muted">Nenhuma ocorrência encontrada.</p>'
+        return
+      }
+      summaryEl.innerHTML = list.map(item =>{
+        const slaBadge = item.slaViolation === 'Infringiu' ? '<span class="badge danger">SLA</span>' : ''
+        const attendanceLabel = item.attendances.length ? `${item.attendances.length} atendimento(s)` : 'Sem atendimento'
+        return `<article class="summary-item">
+          <div class="summary-content">
+            <h4>Ocorrência #${item.id || '-'} ${slaBadge}</h4>
+            <p>${item.type || 'Sem tipo'} · ${item.neighborhood || 'Sem bairro'} · ${item.status || 'Sem status'}</p>
+            <div class="summary-meta">
+              <small>${item.gravity || 'Sem gravidade'} · ${item.dateTime || ''}</small>
+              <small>${attendanceLabel}</small>
+            </div>
+          </div>
+          <button class="btn small" type="button" data-history-id="${item.id}">Detalhes</button>
+        </article>`
+      }).join('')
+    }
+
+    async function loadHistorySummary(){
+      if(!summaryEl) return
+      summaryEl.innerHTML = '<p class="muted">Carregando ocorrências...</p>'
+      const data = await fetchHistoryRecords()
+      const sorted = data.slice().sort((a,b)=>{
+        const aTime = a.rawDateTime ? Date.parse(a.rawDateTime) : 0
+        const bTime = b.rawDateTime ? Date.parse(b.rawDateTime) : 0
+        return bTime - aTime
+      })
+      dashboardHistoryCache = sorted
+      renderHistorySummary(sorted.slice(0,5))
+    }
+
+    function buildAttendanceHtml(att){
+      return `<li>
+        <strong>Atendimento #${att.atendimentoId || '-'}</strong>
+        <p>${att.ambulanciaPlaca || 'Sem placa'} · ${att.ambulanciaTipo || 'Tipo não informado'} · ${att.baseNome || 'Base não informada'}</p>
+        <small>Despacho: ${formatDateTime(att.dataHoraDespacho)} | Chegada: ${formatDateTime(att.dataHoraChegada)} | Distância: ${typeof att.distanciaKm === 'number' ? att.distanciaKm.toFixed(2)+' km' : '-'}</small>
+      </li>`
+    }
+
+    function openHistoryDetailById(id){
+      if(!detailBody) return
+      const item = dashboardHistoryCache.find(entry => String(entry.id) === String(id))
+      if(!item){
+        detailBody.innerHTML = '<p class="muted">Ocorrência não encontrada.</p>'
+      } else {
+        const attendanceHtml = item.attendances.length
+          ? `<ul class="detail-list">${item.attendances.map(buildAttendanceHtml).join('')}</ul>`
+          : '<p class="muted">Sem atendimentos registrados.</p>'
+        detailBody.innerHTML = `
+          <dl class="detail-grid">
+            <dt>ID</dt><dd>${item.id || '-'}</dd>
+            <dt>Tipo</dt><dd>${item.type || '-'}</dd>
+            <dt>Gravidade</dt><dd>${item.gravity || '-'}</dd>
+            <dt>Bairro</dt><dd>${item.neighborhood || '-'}</dd>
+            <dt>Status</dt><dd>${item.status || '-'}</dd>
+            <dt>Data/Hora</dt><dd>${item.dateTime || '-'}</dd>
+            <dt>SLA</dt><dd>${item.slaViolation || '-'}</dd>
+            <dt>Observação</dt><dd>${item.observation || 'Sem observações'}</dd>
+          </dl>
+          <section>
+            <h4>Atendimentos</h4>
+            ${attendanceHtml}
+          </section>
+        `
+      }
+
+      if(detailModal && typeof detailModal.showModal === 'function'){
+        if(!detailModal.open) detailModal.showModal()
+      }else if(detailModal){
+        detailModal.setAttribute('open', 'open')
+      }
+    }
+
+    if(summaryEl){
+      summaryEl.addEventListener('click', e=>{
+        const btn = e.target.closest('[data-history-id]')
+        if(!btn) return
+        const id = btn.dataset.historyId
+        if(!id) return
+        openHistoryDetailById(id)
+      })
+      loadHistorySummary()
+    }
+
+    if(refreshHistoryBtn){
+      refreshHistoryBtn.addEventListener('click', loadHistorySummary)
+    }
+
     const canvas = document.getElementById('graphCanvas')
     if(!canvas) return
+    
+    const bairros = await fetchBairros()
 
-    // ----- dados (copiados do usuário) -----
-    const bairros = [
-      {id:1,name:'Jardim América'},
-      {id:2,name:'Centro'},
-      {id:3,name:'Setor Leste'},
-      {id:4,name:'Vila Nova'},
-      {id:5,name:'Alto da Serra'},
-      {id:6,name:'Setor Oeste'},
-      {id:7,name:'Distrito Industrial'},
-      {id:8,name:'Residencial Esperança'},
-      {id:9,name:'Recanto Verde'},
-      {id:10,name:'Ecoparque Sul'},
-      {id:11,name:'Nova Alvorada'},
-      {id:12,name:'Setor das Palmeiras'},
-      {id:13,name:'Colina Azul'},
-      {id:14,name:'Bela Vista'},
-      {id:15,name:'Morada do Sol'},
-      {id:16,name:'Setor Central II'},
-      {id:17,name:'Lago Azul'},
-      {id:18,name:'Residencial Florença'},
-      {id:19,name:'Setor Industrial Norte'},
-      {id:20,name:'Vale do Cerrado'},
-    ]
-    const conexoes = [
-      [9,16,6.4],[15,19,8.3],[17,7,1.2],[3,5,12.2],[12,4,14.0],[13,7,9.2],[13,6,19.2],[5,9,13.2],[16,3,3.4],[8,10,12.8],[20,1,14.4],[14,3,18.1],[2,18,1.9],[6,11,15.7],[1,17,14.5],[3,4,19.2],[14,19,18.9],[15,18,18.5],[20,2,14.7],[15,20,12.7],[17,15,7.9],[4,12,6.4],[5,15,8.6],[6,2,13.4],[14,15,9.4],[9,3,18.7],[18,7,1.7],[13,7,17.5],[18,9,9.0],[15,11,18.3],[3,4,3.0],[7,2,13.9],[20,4,7.7],[5,16,14.3],[13,4,12.8],[1,16,13.4],[14,3,14.3],[2,6,16.7],[11,8,16.6],[11,10,4.6],[4,1,7.0],[11,7,14.4],[13,5,6.2],[9,20,2.7],[13,15,8.3],[17,13,16.3],[10,14,7.9],[8,1,17.9],[9,2,19.3],[16,17,18.4],[6,14,9.0],[2,19,5.1],[6,5,1.3],[2,1,1.4],[20,19,3.7],[20,2,6.5],[4,8,13.1],[4,19,3.8],[16,11,2.8],[13,16,7.8]
-    ]
+    
+    const conexoesReq = await fetch(
+      `${API_URL}/localizacao/conexoes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': 'http://localhost:8080'
+        },
+        body: JSON.stringify({
+          login: usuarioLogin,
+          token: authToken
+        })
+      }
+    )
+    
+    const conexoesResp = await conexoesReq.json()
+    const conexoes = conexoesResp.map(c=>(
+      [c.origem.id, c.destino.id, c.distanciaKm]
+    ))
 
     // ----- configurar bases / ambulâncias -----
-    // ajuste aqui: ids das bases (vértices) e disponibilidade
-    // Exemplo: base 2 (Centro) e base 11 (Nova Alvorada) têm ambulância disponível
     const bases = readBases()
 
     // ----- criar nós e arestas -----
@@ -461,6 +743,7 @@
     window._bases = bases
 
   }
+  
   function initOccurrencesUI(){
     const form = document.getElementById('occurrenceForm')
     const table = document.getElementById('occurrenceTable')
@@ -473,20 +756,185 @@
       const tz = new Date(now.getTime()-now.getTimezoneOffset()*60000)
       dt.value = tz.toISOString().slice(0,16)
     }
+    
+    // Carregar bairros no select de localização e no filtro
+    async function loadBairrosIntoSelect(){
+      const bairros = await fetchBairros()
+      
+      const locationSelect = document.getElementById('occLocation')
+      if(locationSelect) {
+        locationSelect.innerHTML = '<option value="">Selecione o bairro</option>' +
+          bairros.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')
+      }
+      
+      const filterNeighborhood = document.getElementById('filterOccNeighborhood')
+      if(filterNeighborhood) {
+        filterNeighborhood.innerHTML = '<option value="">Bairro</option>' +
+          bairros.map(b=>`<option value="${b.name}">${b.name}</option>`).join('')
+      }
+    }
+    loadBairrosIntoSelect()
+    
+    // Buscar ocorrências da API
+    async function fetchOccurrencesFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/ocorrencia/listar-ocorrencias`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        })
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        
+        // Mapear resposta da API para formato local
+        return data.map(occ => {
+          return {
+            id: occ.id || '',
+            neighborhood: occ.bairro?.nomeBairro || '',
+            type: occ.tipo?.tipo || '',
+            severity: occ.gravidade?.gravidade || '',
+            status: occ.status?.status || '',
+            dateTime: occ.dataHoraAbertura ? new Date(occ.dataHoraAbertura).toLocaleString('pt-BR') : '',
+            notes: occ.observacao || '',
+            justification: occ.justificativa || ''
+          }
+        })
+      }catch(err){
+        console.error('Erro ao buscar ocorrências', err)
+        return []
+      }
+    }
+    
+    let occurrencesCache = []
+    
     function read(){
       try{ return JSON.parse(localStorage.getItem('occurrences')||'[]') }catch(e){ return [] }
     }
     function write(list){ localStorage.setItem('occurrences', JSON.stringify(list)) }
-    function render(){
-      const all = read()
+    
+    async function render(){
+      const all = await fetchOccurrencesFromApi()
+      occurrencesCache = all
       const s = severitySel && severitySel.value ? severitySel.value : ''
-      const n = neighInp && neighInp.value ? neighInp.value.toLowerCase() : ''
+      const n = neighInp && neighInp.value ? neighInp.value : ''
       const st = statusSel && statusSel.value ? statusSel.value : ''
-      const rows = all.filter(o=>(!s||o.severity===s)&&(!st||o.status===st)&&(!n||String(o.neighborhood||'').toLowerCase().includes(n)))
-      const header = '<tr><th>ID</th><th>Bairro</th><th>Tipo</th><th>Severidade</th><th>Status</th><th>Data/Hora</th></tr>'
-      const body = rows.map(o=>`<tr><td>${o.id||''}</td><td>${o.neighborhood||''}</td><td>${o.type||''}</td><td>${o.severity||''}</td><td>${o.status||''}</td><td>${o.dateTime||''}</td></tr>`).join('')
-      if(table) table.innerHTML = header+body
+      const rows = all.filter(o=>(!s||o.severity===s)&&(!st||o.status===st)&&(!n||o.neighborhood===n))
+      const header = '<thead><tr><th>Bairro</th><th>Tipo</th><th>Severidade</th><th>Status</th><th>Data/Hora</th><th>Ações</th></tr></thead>'
+      const body = rows.map((o,idx)=>`<tr><td>${o.neighborhood||''}</td><td>${o.type||''}</td><td>${o.severity||''}</td><td>${o.status||''}</td><td>${o.dateTime||''}</td><td><button class="icon-button" title="Editar status" onclick="window.editOccurrence(${all.indexOf(o)})">✏️</button></td></tr>`).join('')
+      if(table) table.innerHTML = header+`<tbody>${body}</tbody>`
     }
+    
+    // Modal de edição
+    const editModal = document.getElementById('occurrenceEditModal')
+    const editForm = document.getElementById('occurrenceEditForm')
+    const editStatusSelect = document.getElementById('editOccStatus')
+    const editErrorEl = document.getElementById('occurrenceEditError')
+    const editCancelBtn = document.getElementById('editOccCancel')
+    let editingOccurrenceIndex = -1
+    
+    window.editOccurrence = function(index){
+      editingOccurrenceIndex = index
+      const occ = occurrencesCache[index]
+      if(!occ) return
+      
+      const editNotesTextarea = document.getElementById('editOccNotes')
+      const editJustificativaTextarea = document.getElementById('editOccJustificativa')
+      
+      if(editStatusSelect) editStatusSelect.value = occ.status || 'Aberta'
+      if(editNotesTextarea) editNotesTextarea.value = occ.notes || ''
+      if(editJustificativaTextarea) {
+        editJustificativaTextarea.value = occ.justification || ''
+        editJustificativaTextarea.disabled = false
+        editJustificativaTextarea.required = true
+      }
+      if(editErrorEl) editErrorEl.textContent = ''
+      if(editModal) editModal.hidden = false
+    }
+    
+    if(editCancelBtn){
+      editCancelBtn.addEventListener('click', ()=>{
+        if(editModal) editModal.hidden = true
+        editingOccurrenceIndex = -1
+        if(editErrorEl) editErrorEl.textContent = ''
+      })
+    }
+    
+    if(editForm){
+      editForm.addEventListener('submit', async e=>{
+        e.preventDefault()
+        if(editingOccurrenceIndex < 0) return
+        
+        const occ = occurrencesCache[editingOccurrenceIndex]
+        const newStatus = editStatusSelect?.value || ''
+        const editNotesTextarea = document.getElementById('editOccNotes')
+        const editJustificativaTextarea = document.getElementById('editOccJustificativa')
+        const notes = editNotesTextarea?.value.trim() || ''
+        const justificativa = editJustificativaTextarea?.value.trim() || ''
+        
+        if(!newStatus){
+          if(editErrorEl) editErrorEl.textContent = 'Selecione um status.'
+          return
+        }
+        
+        if(!justificativa){
+          if(editErrorEl) editErrorEl.textContent = 'Justificativa obrigatória para alteração de status.'
+          return
+        }
+        
+        const statusToId = {
+          'Aberta': 1,
+          'Despachada': 2,
+          'Em atendimento': 3,
+          'Concluída': 4,
+          'Cancelada': 5
+        }
+        const statusId = statusToId[newStatus] || 1
+        
+        // Construir body com campos obrigatórios e opcionais
+        const payload = {
+          login: usuarioLogin,
+          token: authToken,
+          ocorrenciaId: occ.id,
+          statusId: statusId,
+          observacao: notes || '',
+          justificativa: justificativa
+        }
+        
+        try{
+          const resp = await fetch(`${API_URL}/ocorrencia/editar-ocorrencia`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': 'http://localhost:8080'
+            },
+            body: JSON.stringify(payload)
+          })
+          
+          if(!resp.ok){
+            const errData = await resp.json().catch(()=>({}))
+            throw new Error(errData.mensagem || `Status ${resp.status}`)
+          }
+        }catch(err){
+          console.error('Erro ao editar ocorrência', err)
+          if(editErrorEl) editErrorEl.textContent = 'Falha ao editar ocorrência.'
+          return
+        }
+        
+        if(editErrorEl) editErrorEl.textContent = ''
+        toast('Ocorrência atualizada')
+        if(editModal) editModal.hidden = true
+        editingOccurrenceIndex = -1
+        render()
+      })
+    }
+    
     function toast(msg){
       const t = document.getElementById('toast')
       if(!t) return
@@ -495,25 +943,88 @@
       setTimeout(()=>{ t.hidden = true }, 1800)
     }
     if(form){
-      form.addEventListener('submit',e=>{
+      form.addEventListener('submit',async e=>{
         e.preventDefault()
         const err = document.getElementById('occurrenceError')
-        const id = document.getElementById('occId')?.value||''
-        const loc = document.getElementById('occLocation')?.value||''
-        const neigh = document.getElementById('occNeighborhood')?.value||''
+        const locationSelect = document.getElementById('occLocation')
+        const locationId = locationSelect?.value||''
+        const locationText = locationSelect?.selectedOptions?.[0]?.textContent || ''
         const type = document.getElementById('occType')?.value||''
         const severity = document.getElementById('occSeverity')?.value||''
         const dateTime = document.getElementById('occDateTime')?.value||''
-        const status = document.getElementById('occStatus')?.value||''
         const notes = document.getElementById('occNotes')?.value||''
-        if(!neigh){ if(err) err.textContent = 'Selecione um bairro no mapa.'; return }
+        
+        if(!locationId){ if(err) err.textContent = 'Selecione um bairro.'; return }
+        if(!type){ if(err) err.textContent = 'Digite o tipo de acidente.'; return }
+        if(!severity){ if(err) err.textContent = 'Selecione a gravidade.'; return }
+        if(!dateTime){ if(err) err.textContent = 'Informe a data/hora.'; return }
+        
         if(err) err.textContent = ''
-        const list = read()
-        list.push({id, location:loc, neighborhood:neigh, type, severity, dateTime, status, notes})
-        write(list)
-        render()
-        toast('Ocorrência salva')
-        form.reset()
+        
+        // Mapear severidade para gravidadeId (ajuste conforme IDs do backend)
+        const severityToId = {
+          'Alta': 1,
+          'Media': 2,
+          'Baixa': 3,
+        }
+        const gravidadeId = severityToId[severity] || 1
+        
+        // Todas as ocorrências são criadas como "Aberta" (statusId = 1)
+        const statusId = 1
+        
+        // Converter dateTime para formato Date (ISO)
+        const dataHoraAbertura = new Date(dateTime).toISOString()
+        
+        // Construir URL com parâmetros
+        const params = new URLSearchParams({
+          observacao: notes || 'Sem observações',
+          gravidadeId: String(gravidadeId),
+          bairroId: locationId,
+          tipoAcidente: type,
+          dataHoraAbertura: dataHoraAbertura,
+          statusId: String(statusId)
+        })
+        
+        try {
+          const resp = await fetch(`${API_URL}/ocorrencia/cadastrar?${params.toString()}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': 'http://localhost:8080'
+            },
+            body: JSON.stringify({
+              login: usuarioLogin,
+              token: authToken
+            })
+          })
+          
+          if(!resp.ok){
+            const errorData = await resp.json().catch(()=>({}))
+            throw new Error(errorData.mensagem || `Status ${resp.status}`)
+          }
+          
+          // Salvar também localmente para exibição
+          const list = read()
+          list.push({
+            location: locationText,
+            locationId,
+            neighborhood: locationText,
+            type,
+            severity,
+            dateTime,
+            status,
+            notes
+          })
+          write(list)
+          render()
+          toast('Ocorrência cadastrada com sucesso')
+          form.reset()
+          loadBairrosIntoSelect()
+          
+        } catch(apiErr) {
+          console.error('Erro ao cadastrar ocorrência:', apiErr)
+          if(err) err.textContent = 'Falha ao cadastrar ocorrência: ' + apiErr.message
+        }
       })
     }
     ;['change','input'].forEach(ev=>{
@@ -523,6 +1034,517 @@
     })
     render()
   }
+  
+  function initDispatchUI(){
+    const occurrenceSelect = document.getElementById('dispatchOccurrence')
+    const ambulanceSelect = document.getElementById('dispatchAmbulance')
+    const dispatchBtn = document.getElementById('dispatchBtn')
+    const errorEl = document.getElementById('dispatchError')
+    
+    // Buscar ocorrências da API
+    async function fetchOccurrencesFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/ocorrencia/listar-ocorrencias`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        })
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        
+        // Mapear resposta da API e filtrar apenas ocorrências abertas
+        return data.filter(occ => occ.status?.status === 'Aberta').map(occ => {
+          return {
+            id: occ.id || '',
+            neighborhood: occ.bairro?.nomeBairro || '',
+            gravity: occ.gravidade?.gravidade || '',
+            dateTime: occ.dataHoraAbertura ? new Date(occ.dataHoraAbertura).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) : ''
+          }
+        })
+      }catch(err){
+        console.error('Erro ao buscar ocorrências', err)
+        return []
+      }
+    }
+    
+    // Carregar ocorrências no dropdown
+    async function loadOccurrences(){
+      const occurrences = await fetchOccurrencesFromApi()
+      if(occurrenceSelect){
+        occurrenceSelect.innerHTML = '<option value="">Selecione uma ocorrência</option>' +
+          occurrences.map(occ => `<option value="${occ.id}">${occ.id} - ${occ.neighborhood} - ${occ.gravity} - ${occ.dateTime}</option>`).join('')
+      }
+    }
+    
+    // Buscar ambulâncias disponíveis para a ocorrência selecionada
+    async function fetchAvailableAmbulances(occurrenceId){
+      try{
+        const params = new URLSearchParams({
+          ocorrenciaId: String(occurrenceId)
+        })
+        
+        const resp = await fetch(`${API_URL}/ocorrencia/disponiveis?${params.toString()}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        })
+        
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        
+        if(!Array.isArray(data)){
+          console.error('Resposta da API não é um array:', data)
+          if(ambulanceSelect){
+            ambulanceSelect.innerHTML = '<option value="">Nenhuma ambulância disponível</option>'
+          }
+          return
+        }
+        
+        console.log('Ambulâncias disponíveis:', data)
+        
+        if(ambulanceSelect){
+          if(data.length === 0){
+            ambulanceSelect.innerHTML = '<option value="">Nenhuma ambulância disponível</option>'
+          } else {
+            ambulanceSelect.innerHTML = '<option value="">Selecione uma ambulância</option>' +
+              data.map(amb => {
+                const slaIcon = amb.dentroDoSLA ? '🟢' : '🔴'
+                const distancia = amb.distanciaKm ? amb.distanciaKm.toFixed(2) : '0.00'
+                const tempo = amb.tempoEstimadoMinutos ? Math.round(amb.tempoEstimadoMinutos) : '0'
+                return `<option value="${amb.ambulanciaId}">${amb.placa} | ${amb.baseNome} | ${distancia} km | ${tempo} min | ${slaIcon}</option>`
+              }).join('')
+          }
+        }
+        
+      }catch(err){
+        console.error('Erro ao buscar ambulâncias disponíveis', err)
+        if(errorEl) errorEl.textContent = 'Erro ao buscar ambulâncias disponíveis.'
+        if(ambulanceSelect){
+          ambulanceSelect.innerHTML = '<option value="">Erro ao carregar ambulâncias</option>'
+        }
+      }
+    }
+    
+    // Listener para quando selecionar uma ocorrência
+    if(occurrenceSelect){
+      occurrenceSelect.addEventListener('change', ()=>{
+        const occurrenceId = occurrenceSelect.value
+        if(occurrenceId){
+          if(errorEl) errorEl.textContent = ''
+          fetchAvailableAmbulances(occurrenceId)
+        } else {
+          // Limpar dropdown de ambulâncias se nenhuma ocorrência estiver selecionada
+          if(ambulanceSelect){
+            ambulanceSelect.innerHTML = '<option value="">Selecione uma ambulância</option>'
+          }
+        }
+      })
+    }
+    
+    // Listener para o botão de despacho
+    if(dispatchBtn){
+      dispatchBtn.addEventListener('click', async ()=>{
+        const occurrenceId = occurrenceSelect?.value || ''
+        const ambulanceId = ambulanceSelect?.value || ''
+        
+        // Validações
+        if(!occurrenceId){
+          if(errorEl) errorEl.textContent = 'Selecione uma ocorrência.'
+          return
+        }
+        
+        if(!ambulanceId){
+          if(errorEl) errorEl.textContent = 'Selecione uma ambulância.'
+          return
+        }
+        
+        if(errorEl) errorEl.textContent = ''
+        
+        // Construir parâmetros da URL
+        const params = new URLSearchParams({
+          ocorrenciaId: occurrenceId,
+          ambulanciaId: ambulanceId
+        })
+        
+        try{
+          const resp = await fetch(`${API_URL}/ocorrencia/despachar?${params.toString()}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': 'http://localhost:8080'
+            },
+            body: JSON.stringify({
+              login: usuarioLogin,
+              token: authToken
+            })
+          })
+          
+          if(!resp.ok){
+            const errorData = await resp.json().catch(()=>({}))
+            throw new Error(errorData.mensagem || `Status ${resp.status}`)
+          }
+          
+          toast('Ambulância despachada com sucesso')
+          
+          // Limpar seleções e recarregar ocorrências
+          if(occurrenceSelect) occurrenceSelect.value = ''
+          if(ambulanceSelect) ambulanceSelect.innerHTML = '<option value="">Selecione uma ambulância</option>'
+          loadOccurrences()
+          
+        }catch(err){
+          console.error('Erro ao despachar ambulância:', err)
+          if(errorEl) errorEl.textContent = 'Falha ao despachar: ' + err.message
+        }
+      })
+    }
+    
+    function toast(msg){
+      const t = document.getElementById('toast')
+      if(!t) return
+      t.textContent = msg
+      t.hidden = false
+      setTimeout(()=>{ t.hidden = true }, 1800)
+    }
+    
+    loadOccurrences()
+  }
+  
+  function initTeamsUI(){
+    const form = document.getElementById('teamForm')
+    const table = document.getElementById('teamTable')
+    const filterShift = document.getElementById('filterTeamShift')
+    const filterAmb = document.getElementById('filterTeamAmb')
+    const filterDriver = document.getElementById('filterTeamDriver')
+    const filterNurse = document.getElementById('filterTeamNurse')
+    const filterDoctor = document.getElementById('filterTeamDoctor')
+    
+    let teamsCache = []
+    let professionalsCache = []
+    
+    // Buscar equipes da API
+    async function fetchTeamsFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/equipe/listar-equipes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        })
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        
+        return data.map(team => {
+          // Extrair profissionais do array
+          const profissionais = team.profissionais || []
+          const driver = profissionais.find(p => p.funcao === 'Condutor')
+          const nurse = profissionais.find(p => p.funcao === 'Enfermeiro')
+          const doctor = profissionais.find(p => p.funcao === 'Médico')
+          
+          return {
+            id: team.id || '',
+            shift: team.turno?.descricao || '',
+            ambulance: team.ambulancia?.placa || '',
+            driver: driver?.nome || '',
+            nurse: nurse?.nome || '',
+            doctor: doctor?.nome || ''
+          }
+        })
+      }catch(err){
+        console.error('Erro ao buscar equipes', err)
+        return []
+      }
+    }
+    
+    // Buscar profissionais da API
+    async function fetchProfessionalsFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/profissional/listar-profissionais`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        })
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        
+        return data.map(p => ({
+          id: p.id || '',
+          name: p.nome || '',
+          role: p.funcao?.profissao || '',
+          active: p.ativo === true
+        }))
+      }catch(err){
+        console.error('Erro ao buscar profissionais', err)
+        return []
+      }
+    }
+    
+    // Buscar ambulâncias da API
+    async function fetchAmbulancesFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/ambulancia/listar-ambulancias`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify({
+            login: usuarioLogin,
+            token: authToken
+          })
+        })
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        
+        return data.map(amb => ({
+          id: amb.id || '',
+          plate: amb.placa || '',
+          type: amb.tipo?.tipo || '',
+          baseName: amb.base?.nome || '',
+          active: amb.status?.status === 'Disponivel' || false
+        }))
+      }catch(err){
+        console.error('Erro ao buscar ambulâncias', err)
+        return []
+      }
+    }
+    
+    // Carregar ambulâncias no dropdown
+    async function loadAmbulancesIntoSelect(){
+      const ambulances = await fetchAmbulancesFromApi()
+      const ambulanceSelect = document.getElementById('teamAmb')
+      const filterAmbulanceSelect = document.getElementById('filterTeamAmb')
+      
+      // Filtrar apenas ambulâncias ativas
+      const activeAmbulances = ambulances.filter(amb => amb.active)
+      
+      if(ambulanceSelect){
+        ambulanceSelect.innerHTML = '<option value="">Selecione a ambulância</option>' +
+          activeAmbulances.map(amb => `<option value="${amb.id}">${amb.plate} | ${amb.baseName} | ${amb.type}</option>`).join('')
+      }
+      
+      if(filterAmbulanceSelect){
+        filterAmbulanceSelect.innerHTML = '<option value="">Ambulância</option>' +
+          activeAmbulances.map(amb => `<option value="${amb.plate}">${amb.plate} | ${amb.baseName} | ${amb.type}</option>`).join('')
+      }
+    }
+    
+    // Carregar profissionais nos dropdowns
+    async function loadProfessionalsIntoSelects(){
+      professionalsCache = await fetchProfessionalsFromApi()
+      
+      const driverSelect = document.getElementById('profDriver')
+      const nurseSelect = document.getElementById('profNurse')
+      const doctorSelect = document.getElementById('profDoctor')
+      const filterDriverSelect = document.getElementById('filterTeamDriver')
+      const filterNurseSelect = document.getElementById('filterTeamNurse')
+      const filterDoctorSelect = document.getElementById('filterTeamDoctor')
+      
+      const drivers = professionalsCache.filter(p => p.role === 'Condutor' && p.active)
+      const nurses = professionalsCache.filter(p => p.role === 'Enfermeiro' && p.active)
+      const doctors = professionalsCache.filter(p => p.role === 'Médico' && p.active)
+      
+      if(driverSelect){
+        driverSelect.innerHTML = '<option value="">Selecione o motorista</option>' +
+          drivers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+      }
+      
+      if(nurseSelect){
+        nurseSelect.innerHTML = '<option value="">Selecione o enfermeiro</option>' +
+          nurses.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+      }
+      
+      if(doctorSelect){
+        doctorSelect.innerHTML = '<option value="">Selecione o médico</option>' +
+          doctors.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+      }
+      
+      if(filterDriverSelect){
+        filterDriverSelect.innerHTML = '<option value="">Motorista</option>' +
+          drivers.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+      }
+      
+      if(filterNurseSelect){
+        filterNurseSelect.innerHTML = '<option value="">Enfermeiro(a)</option>' +
+          nurses.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+      }
+      
+      if(filterDoctorSelect){
+        filterDoctorSelect.innerHTML = '<option value="">Médico(a)</option>' +
+          doctors.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+      }
+    }
+    
+    async function render(){
+      const all = await fetchTeamsFromApi()
+      teamsCache = all
+      
+      const shift = filterShift && filterShift.value ? filterShift.value : ''
+      const amb = filterAmb && filterAmb.value ? filterAmb.value : ''
+      const driver = filterDriver && filterDriver.value ? filterDriver.value : ''
+      const nurse = filterNurse && filterNurse.value ? filterNurse.value : ''
+      const doctor = filterDoctor && filterDoctor.value ? filterDoctor.value : ''
+      
+      const rows = all.filter(t => 
+        (!shift || t.shift === shift) &&
+        (!amb || t.ambulance === amb) &&
+        (!driver || t.driver === driver) &&
+        (!nurse || t.nurse === nurse) &&
+        (!doctor || t.doctor === doctor)
+      )
+      
+      const header = '<thead><tr><th>Turno</th><th>Ambulância</th><th>Motorista</th><th>Enfermeiro</th><th>Médico</th></tr></thead>'
+      const body = rows.map(t => 
+        `<tr><td>${t.shift||''}</td><td>${t.ambulance||''}</td><td>${t.driver||''}</td><td>${t.nurse||''}</td><td>${t.doctor||''}</td></tr>`
+      ).join('')
+      
+      if(table) table.innerHTML = header + `<tbody>${body}</tbody>`
+    }
+    
+    function toast(msg){
+      const t = document.getElementById('toast')
+      if(!t) return
+      t.textContent = msg
+      t.hidden = false
+      setTimeout(()=>{ t.hidden = true }, 1800)
+    }
+    
+    // Validação do formulário de equipe
+    if(form){
+      form.addEventListener('submit', async e=>{
+        e.preventDefault()
+        const errorEl = document.getElementById('teamError')
+        
+        const shiftSelect = document.getElementById('ambShift')
+        const ambulanceSelect = document.getElementById('teamAmb')
+        const driverSelect = document.getElementById('profDriver')
+        const nurseSelect = document.getElementById('profNurse')
+        const doctorSelect = document.getElementById('profDoctor')
+        
+        const shift = shiftSelect?.value || ''
+        const ambulanceId = ambulanceSelect?.value || ''
+        const driverId = driverSelect?.value || ''
+        const nurseId = nurseSelect?.value || ''
+        const doctorId = doctorSelect?.value || ''
+        
+        // Validações básicas
+        if(!shift){
+          if(errorEl) errorEl.textContent = 'Selecione o turno.'
+          return
+        }
+        
+        if(!ambulanceId){
+          if(errorEl) errorEl.textContent = 'Selecione a ambulância.'
+          return
+        }
+        
+        // Verificar tipo de ambulância selecionada
+        const selectedOption = ambulanceSelect.selectedOptions?.[0]
+        const optionText = selectedOption?.textContent || ''
+        const isUTI = optionText.includes('UTI')
+        const isBasica = optionText.includes('Basica')
+        
+        // Validações baseadas no tipo de ambulância
+        if(isBasica){
+          // Ambulância Básica: apenas condutor obrigatório
+          if(!driverId){
+            if(errorEl) errorEl.textContent = 'Para ambulância Básica, selecione ao menos o condutor.'
+            return
+          }
+        } else if(isUTI){
+          // Ambulância UTI: todos os profissionais obrigatórios
+          if(!driverId || !nurseId || !doctorId){
+            if(errorEl) errorEl.textContent = 'Para ambulância UTI, selecione o condutor, enfermeiro e médico.'
+            return
+          }
+        } else {
+          // Se não conseguiu identificar o tipo, exige pelo menos o condutor
+          if(!driverId){
+            if(errorEl) errorEl.textContent = 'Selecione ao menos o condutor.'
+            return
+          }
+        }
+        
+        if(errorEl) errorEl.textContent = ''
+        
+        // Construir parâmetros da query - usar 0 para campos não preenchidos em ambulância básica
+        const params = new URLSearchParams({
+          turnoId: shift,
+          ambulanciaId: ambulanceId,
+          motoristaId: driverId || '0',
+          enfermeiroId: nurseId || '0',
+          medicoId: doctorId || '0'
+        })
+        
+        try {
+          const resp = await fetch(`${API_URL}/equipe/cadastrar?${params.toString()}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': 'http://localhost:8080'
+            },
+            body: JSON.stringify({
+              login: usuarioLogin,
+              token: authToken
+            })
+          })
+          
+          if(!resp.ok){
+            const errorData = await resp.json().catch(()=>({}))
+            throw new Error(errorData.mensagem || `Status ${resp.status}`)
+          }
+          
+          toast('Equipe cadastrada com sucesso')
+          form.reset()
+          await loadAmbulancesIntoSelect()
+          await loadProfessionalsIntoSelects()
+          render()
+        } catch(apiErr) {
+          console.error('Erro ao cadastrar equipe:', apiErr)
+          if(errorEl) errorEl.textContent = 'Falha ao cadastrar equipe: ' + apiErr.message
+        }
+      })
+    }
+    
+    loadAmbulancesIntoSelect()
+    loadProfessionalsIntoSelects()
+    render()
+    
+    ;['change','input'].forEach(ev=>{
+      if(filterShift) filterShift.addEventListener(ev, render)
+      if(filterAmb) filterAmb.addEventListener(ev, render)
+      if(filterDriver) filterDriver.addEventListener(ev, render)
+      if(filterNurse) filterNurse.addEventListener(ev, render)
+      if(filterDoctor) filterDoctor.addEventListener(ev, render)
+    })
+  }
+  
   function populateBaseSelect(el, bases, emptyLabel){
     if(!el) return
     el.innerHTML = ''
@@ -536,32 +1558,168 @@
       const opt = document.createElement('option')
       opt.value = String(b.nodeId)
       opt.textContent = b.name
+      if(b.baseId) opt.dataset.baseId = String(b.baseId)
       el.appendChild(opt)
     })
   }
-  function initAmbulancesUI(){
-    const bases = readBases()
+  async function initAmbulancesUI(){
+    async function fetchBasesFromApi(){
+      try{
+        const resp = await fetch(
+          `${API_URL}/localizacao/bases`,{
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Access-Control-Allow-Origin':'http://localhost:8080'
+            },
+            body:JSON.stringify({ login: usuarioLogin, token: authToken })
+          }
+        )
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        return data.map(b=>({
+          baseId: b.id,
+          nodeId: b.bairro?.id || null,
+          name: b.nome || '',
+          bairroNome: b.bairro?.nomeBairro || '',
+          endereco: b.endereco || ''
+        }))
+      }catch(err){
+        console.error('Erro ao buscar bases na API', err)
+        return []
+      }
+    }
+    
+    const bases = await fetchBasesFromApi()
     const filterSel = document.getElementById('filterAmbBase')
     const formSel = document.getElementById('ambBase')
     populateBaseSelect(filterSel, bases, 'Base')
     populateBaseSelect(formSel, bases, '')
-  }
-  function initProfessionalsUI(){
-    const bases = readBases()
-    const filterSel = document.getElementById('filterProfBase')
-    const formSel = document.getElementById('profBase')
-    populateBaseSelect(filterSel, bases, 'Base')
-    populateBaseSelect(formSel, bases, '')
-  }
-  function initBasesUI(){
-    const form = document.getElementById('baseForm')
-    const table = document.getElementById('baseTable')
-    function render(){
-      const bases = readBases()
-      const header = '<tr><th>Node ID</th><th>Nome</th><th>Disponível</th></tr>'
-      const body = bases.map(b=>`<tr><td>${b.nodeId}</td><td>${b.name}</td><td>${b.available?'Sim':'Não'}</td></tr>`).join('')
-      if(table) table.innerHTML = header+body
+
+    const table = document.getElementById('ambulanceTable')
+    const filterType = document.getElementById('filterAmbType')
+    
+    let ambulancesCache = []
+
+    async function fetchAmbulancesFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/ambulancia/listar-ambulancias`,{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Access-Control-Allow-Origin':'http://localhost:8080'
+          },
+          body: JSON.stringify({ login: usuarioLogin, token: authToken })
+        })
+        if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        return data.map(item=>{
+          /*
+          Exemplo de resposta da API:
+          {"id":1,"placa":"1234-ABC","tipo":{"id":1,"tipo":"UTI"},
+          "status":{"id":1,"status":"Disponivel"},
+          "base":{"id":1,"nome":"H do Centro","bairro":{"id":2,"nomeBairro":"Centro"},
+          "endereco":"Qd 15 N 16"},"ativo":false}
+          */
+          const tipoStr = item.tipo?.tipo || ''
+          const statusStr = item.status?.status || ''
+          
+          return {
+            id: item.id || 0,
+            plate: item.placa || '',
+            type: tipoStr,
+            tipoId: item.tipo?.id || 0,
+            baseId: item.base?.id || 0,
+            baseNodeId: item.base?.bairro?.id || 0,
+            baseName: item.base?.nome || '',
+            status: statusStr,
+            statusId: item.status?.id || 0
+          }
+        })
+      }catch(err){
+        console.error('Erro ao buscar ambulâncias', err)
+        return []
+      }
     }
+
+    async function renderAmbulances(){
+      const list = await fetchAmbulancesFromApi()
+      ambulancesCache = list
+      const typeFilterValue = filterType?.value || ''
+      const baseFilterValue = filterSel?.value || ''
+      const filtered = list.filter(a=>{
+        const matchesType = !typeFilterValue || a.type === typeFilterValue
+        const matchesBase = !baseFilterValue || (a.baseNodeId && String(a.baseNodeId) === baseFilterValue)
+        return matchesType && matchesBase
+      })
+      const header = '<thead><tr><th>Placa</th><th>Tipo</th><th>Base</th><th>Status</th><th>Ações</th></tr></thead>'
+      const body = filtered.map((a, idx)=>{
+        const statusLabel = a.status || '—'
+        const baseLabel = a.baseName || '—'
+        const originalIndex = list.indexOf(a)
+        return `<tr><td>${a.plate || '—'}</td><td>${a.type || '—'}</td><td>${baseLabel}</td><td>${statusLabel}</td><td><button class="icon-button" title="Editar" onclick="window.editAmbulance(${originalIndex})">✏️</button></td></tr>`
+      }).join('')
+      if(table){
+        table.innerHTML = header + `<tbody>${body}</tbody>`
+      }
+    }
+
+    ;['change','input'].forEach(ev=>{
+      if(filterType) filterType.addEventListener(ev, renderAmbulances)
+      if(filterSel) filterSel.addEventListener(ev, renderAmbulances)
+    })
+
+    const form = document.getElementById('ambulanceForm')
+    const plateInput = document.getElementById('ambPlate')
+    const typeSelect = document.getElementById('ambType')
+    const statusSelect = document.getElementById('ambStatus')
+    const errorEl = document.getElementById('ambulanceError')
+    const tipoToId = { 'UTI': 1, 'Basica': 2 }
+    const idToTipo = { 1: 'UTI', 2: 'Basica' }
+    const statusToId = {
+      'Disponivel': 1,
+      'EmAtendimento': 2,
+      'Inativa': 3,
+      'EmManutencao': 4
+    }
+    const idToStatus = { 1: 'Disponivel', 2: 'EmAtendimento', 3: 'Inativa', 4: 'EmManutencao' }
+
+    function formatPlate(value){
+      const cleaned = (value || '').toUpperCase().replace(/[^A-Z0-9]/g,'')
+      let digits = ''
+      let letters = ''
+      for(const ch of cleaned){
+        if(digits.length < 4 && /[0-9]/.test(ch)){
+          digits += ch
+          continue
+        }
+        if(digits.length === 4 && letters.length < 3 && /[A-Z]/.test(ch)){
+          letters += ch
+        }
+      }
+      let formatted = digits
+      if(digits.length === 4){
+        formatted += letters.length ? '-' + letters : '-'
+      }
+      return formatted
+    }
+
+    function handlePlateInput(){
+      if(!plateInput) return
+      const caret = plateInput.selectionStart || 0
+      const oldLength = plateInput.value.length
+      const formatted = formatPlate(plateInput.value)
+      plateInput.value = formatted
+      const diff = formatted.length - oldLength
+      plateInput.selectionStart = plateInput.selectionEnd = Math.max(0, caret + diff)
+    }
+
+    function showError(msg){
+      if(!errorEl) return
+      errorEl.textContent = msg
+    }
+
     function toast(msg){
       const t = document.getElementById('toast')
       if(!t) return
@@ -569,27 +1727,569 @@
       t.hidden = false
       setTimeout(()=>{ t.hidden = true }, 1800)
     }
+
+    async function submitAmbulance(){
+      if(!formSel) {
+        showError('Selecione uma base válida.')
+        return false
+      }
+      const plate = plateInput?.value.trim() || ''
+      const typeValue = typeSelect?.value || ''
+      const statusValue = statusSelect?.value || ''
+      const baseOption = formSel.selectedOptions?.[0]
+      
+      // Pegar o baseId do dataset (ID da base no banco) e nodeId do value (ID do bairro)
+      const baseId = baseOption?.dataset.baseId ? Number(baseOption.dataset.baseId) : null
+      
+      if(!plate || !typeValue || !baseId || !statusValue){
+        showError('Preencha placa, tipo, base e status.')
+        return false
+      }
+      const tipoId = tipoToId[typeValue] || 0
+      const statusId = statusToId[statusValue] || 0
+      if(!tipoId || !statusId){
+        showError('Tipo ou status inválido.')
+        return false
+      }
+      
+      console.log('Cadastrando ambulância:', { plate, tipoId, baseId, statusId })
+      
+      const query = new URLSearchParams({
+        placa: plate,
+        tipoId: String(tipoId),
+        baseId: String(baseId),
+        statusId: String(statusId)
+      }).toString()
+      const payload = {
+        login: usuarioLogin,
+        token: authToken
+      }
+      try{
+        const resp = await fetch(`${API_URL}/ambulancia/cadastrar?${query}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': 'http://localhost:8080'
+          },
+          body: JSON.stringify(payload)
+        })
+        if(!resp.ok) throw new Error(`Status ${resp.status}`)
+      }catch(err){
+        console.error('Erro ao cadastrar ambulância', err)
+        showError('Falha ao salvar ambulância.')
+        return false
+      }
+      showError('')
+      toast('Ambulância cadastrada')
+      form?.reset()
+      return true
+    }
+
     if(form){
-      form.addEventListener('submit',e=>{
+      form.addEventListener('submit', async e=>{
+        e.preventDefault()
+        const ok = await submitAmbulance()
+        if(ok){
+          renderAmbulances()
+        }
+      })
+    }
+
+    if(plateInput){
+      plateInput.addEventListener('input', handlePlateInput)
+      plateInput.value = formatPlate(plateInput.value)
+    }
+
+    // Edit modal setup
+    const editModal = document.getElementById('ambulanceEditModal')
+    const editForm = document.getElementById('ambulanceEditForm')
+    const editPlateInput = document.getElementById('editAmbPlate')
+    const editTypeSelect = document.getElementById('editAmbType')
+    const editBaseSelect = document.getElementById('editAmbBase')
+    const editStatusSelect = document.getElementById('editAmbStatus')
+    const editErrorEl = document.getElementById('ambulanceEditError')
+    const editCancelBtn = document.getElementById('editAmbCancel')
+    
+    let editingAmbulanceIndex = -1
+    
+    // Populate edit base select
+    populateBaseSelect(editBaseSelect, bases, '')
+    
+    window.editAmbulance = function(index){
+      editingAmbulanceIndex = index
+      const amb = ambulancesCache[index]
+      if(!amb) return
+      
+      console.log('Editando ambulância:', amb)
+      
+      if(editPlateInput) editPlateInput.value = amb.plate || ''
+      
+      // A API retorna o tipo como string ("UTI" ou "Basica")
+      if(editTypeSelect) editTypeSelect.value = amb.type || 'UTI'
+      
+      // Usar o baseNodeId para selecionar a base (value do option é o nodeId)
+      if(editBaseSelect) editBaseSelect.value = String(amb.baseNodeId || '')
+      
+      // Mapear o status corretamente - usar statusId com fallback para string
+      let statusValue = amb.status || 'Disponivel'
+      if(amb.statusId && idToStatus[amb.statusId]) {
+        statusValue = idToStatus[amb.statusId]
+      }
+      if(editStatusSelect) editStatusSelect.value = statusValue
+      
+      if(editErrorEl) editErrorEl.textContent = ''
+      if(editModal) editModal.hidden = false
+    }
+    
+    if(editCancelBtn){
+      editCancelBtn.addEventListener('click', ()=>{
+        if(editModal) editModal.hidden = true
+        editingAmbulanceIndex = -1
+        if(editErrorEl) editErrorEl.textContent = ''
+      })
+    }
+    
+    if(editPlateInput){
+      editPlateInput.addEventListener('input', function(){
+        const caret = editPlateInput.selectionStart || 0
+        const oldLength = editPlateInput.value.length
+        const formatted = formatPlate(editPlateInput.value)
+        editPlateInput.value = formatted
+        const diff = formatted.length - oldLength
+        editPlateInput.selectionStart = editPlateInput.selectionEnd = Math.max(0, caret + diff)
+      })
+    }
+    
+    if(editForm){
+      editForm.addEventListener('submit', async e=>{
+        e.preventDefault()
+        if(editingAmbulanceIndex < 0) return
+        
+        const amb = ambulancesCache[editingAmbulanceIndex]
+        const plate = editPlateInput?.value.trim() || ''
+        const typeValue = editTypeSelect?.value || ''
+        const statusValue = editStatusSelect?.value || ''
+        const baseOption = editBaseSelect?.selectedOptions?.[0]
+        
+        // Pegar o baseId do dataset (ID da base no banco)
+        const baseId = baseOption?.dataset.baseId ? Number(baseOption.dataset.baseId) : null
+        
+        if(!plate || !typeValue || !baseId || !statusValue){
+          if(editErrorEl) editErrorEl.textContent = 'Preencha todos os campos.'
+          return
+        }
+        
+        const tipoId = tipoToId[typeValue] || 0
+        const statusId = statusToId[statusValue] || 0
+        
+        if(!tipoId || !statusId){
+          if(editErrorEl) editErrorEl.textContent = 'Tipo ou status inválido.'
+          return
+        }
+        
+        console.log('Editando ambulância:', { ambulanciaId: amb.id, plate, tipoId, baseId, statusId })
+        
+        const payload = {
+          token: authToken,
+          login: usuarioLogin,
+          ambulanciaId: amb.id,
+          placa: plate,
+          tipoId: tipoId,
+          baseId: baseId,
+          statusId: statusId
+        }
+        
+        try{
+          const resp = await fetch(`${API_URL}/ambulancia/editar-ambulancia`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': 'http://localhost:8080'
+            },
+            body: JSON.stringify(payload)
+          })
+          
+          if(!resp.ok){
+            const errData = await resp.json().catch(()=>({}))
+            throw new Error(errData.mensagem || `Status ${resp.status}`)
+          }
+        }catch(err){
+          console.error('Erro ao editar ambulância', err)
+          if(editErrorEl) editErrorEl.textContent = 'Falha ao editar ambulância.'
+          return
+        }
+        
+        if(editErrorEl) editErrorEl.textContent = ''
+        toast('Ambulância atualizada')
+        if(editModal) editModal.hidden = true
+        editingAmbulanceIndex = -1
+        renderAmbulances()
+      })
+    }
+
+    renderAmbulances()
+  }
+  function initProfessionalsUI(){
+    const table = document.getElementById('professionalTable')
+    const filterRole = document.getElementById('filterProfRole')
+    const filterStatus = document.getElementById('filterProfStatus')
+    const form = document.getElementById('professionalForm')
+    const errorEl = document.getElementById('professionalError')
+    const editModal = document.getElementById('professionalEditModal')
+    const editForm = document.getElementById('professionalEditForm')
+    const editErrorEl = document.getElementById('professionalEditError')
+    const editNameInput = document.getElementById('editProfName')
+    const editRoleSelect = document.getElementById('editProfRole')
+    const editContactInput = document.getElementById('editProfContact')
+    const editStatusSelect = document.getElementById('editProfStatus')
+    const roleToFuncaoId = {
+      'Condutor': 1,
+      'Enfermeiro': 2,
+      'Médico': 3
+    }
+    let professionalsCache = []
+    let editingProfessionalId = null
+    const funcaoIdToRole = Object.fromEntries(Object.entries(roleToFuncaoId).map(([role, id]) => [String(id), role]))
+
+    function closeEditModal(){
+      if(!editModal) return
+      editModal.hidden = true
+      editingProfessionalId = null
+      if(editErrorEl) editErrorEl.textContent = ''
+      editForm?.reset()
+    }
+
+    function openEditModal(prof){
+      if(!editModal || !editForm || !prof) return
+      editingProfessionalId = prof.id
+      if(editNameInput) editNameInput.value = prof.nome || ''
+      const roleLabel = funcaoIdToRole[String(prof.funcaoId)] || prof.funcao || ''
+      if(editRoleSelect) editRoleSelect.value = roleLabel
+      if(editContactInput) editContactInput.value = prof.contato || ''
+      if(editStatusSelect) editStatusSelect.value = prof.status ? 'Ativo' : 'Inativo'
+      if(editErrorEl) editErrorEl.textContent = ''
+      editModal.hidden = false
+    }
+
+    if(editModal){
+      editModal.addEventListener('click', e=>{
+        if(e.target === editModal) closeEditModal()
+      })
+      editModal.querySelectorAll('[data-modal-action="close"]').forEach(btn=>{
+        btn.addEventListener('click', closeEditModal)
+      })
+    }
+
+    async function fetchProfessionalsFromApi(){
+      try{
+        const resp = await fetch(`${API_URL}/profissional/listar-profissionais`,{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Access-Control-Allow-Origin':'http://localhost:8080'
+          },
+          body:JSON.stringify({ login: usuarioLogin, token: authToken })
+        })
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+
+        return data.map(p=>{
+          const statusValue = p.ativo === true || String(p.ativo).toLowerCase() === 'true'
+          return {
+            id: Number(p.id) || null,
+            nome: p.nome || p.name || '',
+            funcao: p.funcao?.profissao || '',
+            funcaoId: Number(p.funcao?.id) || null,
+            contato: p.contato || p.contact || '',
+            status: statusValue
+          }
+        })
+      }catch(err){
+        console.error('Erro ao buscar profissionais', err)
+        return []
+      }
+    }
+
+    async function render(){
+      const list = await fetchProfessionalsFromApi()
+      professionalsCache = list
+      const roleFilterValue = filterRole?.value || ''
+      const statusFilterValue = filterStatus?.value || ''
+      const filtered = list.filter(p=>{
+        const statusLabel = p.status ? 'Ativo' : 'Inativo'
+        return (!roleFilterValue || p.funcao===roleFilterValue) && (!statusFilterValue || statusLabel===statusFilterValue)
+      })
+      
+      const header = '<thead><tr><th>Nome</th><th>Função</th><th>Contato</th><th>Status</th><th>Ações</th></tr></thead>'
+      const body = filtered.map(p=>{
+        const statusLabel = p.status ? 'Ativo' : 'Inativo'
+        return `<tr><td><span class="truncate" title="${p.nome}">${p.nome}</span></td><td>${p.funcao}</td><td>${p.contato}</td><td>${statusLabel}</td><td><button type="button" class="icon-button" data-action="edit-prof" data-professional-id="${p.id}">✏️</button></td></tr>`
+      }).join('')
+      const bodyWrapper = `<tbody>${body}</tbody>`
+      if(table){
+        table.innerHTML = header + bodyWrapper
+        table.querySelectorAll('[data-action="edit-prof"]').forEach(btn=>{
+          const id = Number(btn.dataset.professionalId)
+          btn.addEventListener('click', ()=>{
+            const prof = professionalsCache.find(p=>p.id === id)
+            if(prof) openEditModal(prof)
+          })
+        })
+      }
+    }
+
+    function toast(msg){
+      const t = document.getElementById('toast')
+      if(!t) return
+      t.textContent = msg
+      t.hidden = false
+      setTimeout(()=>{ t.hidden = true }, 1800)
+    }
+
+    if(editForm){
+      editForm.addEventListener('submit',async e=>{
+        e.preventDefault()
+        if(!editingProfessionalId){
+          if(editErrorEl) editErrorEl.textContent = 'Selecione um profissional para editar.'
+          return
+        }
+        const name = editNameInput?.value.trim() || ''
+        const roleLabel = editRoleSelect?.value || ''
+        const contato = editContactInput?.value.trim() || ''
+        const status = editStatusSelect?.value || ''
+        if(!name || !roleLabel || !contato){
+          if(editErrorEl) editErrorEl.textContent = 'Preencha nome, função e contato.'
+          return
+        }
+        if(editErrorEl) editErrorEl.textContent = ''
+        const funcaoId = roleToFuncaoId[roleLabel] || professionalsCache.find(p=>p.id === editingProfessionalId)?.funcaoId || 0
+        const ativo = status === 'Ativo'
+        const payload = {
+          adminToken: authToken,
+          adminLogin: usuarioLogin,
+          profissionalId: editingProfessionalId,
+          nome: name,
+          contato,
+          funcaoId,
+          ativo
+        }
+        try{
+          const resp = await fetch(`${API_URL}/profissional/editar-profissional`,{
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Access-Control-Allow-Origin':'http://localhost:8080'
+            },
+            body: JSON.stringify(payload)
+          })
+          if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        }catch(err){
+          console.error('Erro ao atualizar profissional', err)
+          if(editErrorEl) editErrorEl.textContent = 'Falha ao atualizar profissional.'
+          return
+        }
+        await render()
+        closeEditModal()
+        toast('Profissional atualizado')
+      })
+    }
+
+    if(form){
+      form.addEventListener('submit',async e=>{
+        e.preventDefault()
+        const name = document.getElementById('profName')?.value.trim() || ''
+        const funcao = document.getElementById('profRole')?.value || ''
+        const contato = document.getElementById('profContact')?.value.trim() || ''
+        const status = document.getElementById('profStatus')?.value || ''
+        if(!name || !funcao || !contato){
+          if(errorEl) errorEl.textContent = 'Preencha nome, função e contato.'
+          return
+        }
+        if(errorEl) errorEl.textContent = ''
+        const funcaoId = roleToFuncaoId[funcao] || 0
+        const ativo = status === 'Ativo' ? 'true' : 'false'
+        const url = `${API_URL}/profissional/cadastrar?nome=${encodeURIComponent(name)}&contato=${encodeURIComponent(contato)}&funcaoId=${encodeURIComponent(funcaoId)}&ativo=${encodeURIComponent(ativo)}`
+        try{
+          const resp = await fetch(url,{ 
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Access-Control-Allow-Origin':'http://localhost:8080'
+            },
+            body:JSON.stringify({ login: usuarioLogin, token: authToken })
+          })
+          if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        }catch(err){
+          console.error('Erro ao salvar profissional', err)
+          if(errorEl) errorEl.textContent = 'Falha ao salvar profissional.'
+          return
+        }
+        await render()
+        toast('Profissional salvo')
+        form.reset()
+      })
+    }
+
+    ;['change','input'].forEach(ev=>{
+      if(filterRole) filterRole.addEventListener(ev, render)
+      if(filterStatus) filterStatus.addEventListener(ev, render)
+    })
+
+    render()
+  }
+  function initBasesUI(){
+    const form = document.getElementById('baseForm')
+    const table = document.getElementById('baseTable')
+    const baseConfirmModal = document.getElementById('baseConfirmModal')
+    const baseConfirmNameEl = document.getElementById('confirmBaseName')
+    const baseConfirmBairroEl = document.getElementById('confirmBaseBairro')
+    const baseConfirmEnderecoEl = document.getElementById('confirmBaseEndereco')
+    let baseConfirmResolver = null
+    if(baseConfirmModal){
+      const confirmBtn = baseConfirmModal.querySelector('[data-modal-action="confirm"]')
+      const cancelBtn = baseConfirmModal.querySelector('[data-modal-action="cancel"]')
+      const settle = value => {
+        baseConfirmModal.hidden = true
+        if(!baseConfirmResolver) return
+        const resolve = baseConfirmResolver
+        baseConfirmResolver = null
+        resolve(value)
+      }
+      confirmBtn?.addEventListener('click',()=>settle(true))
+      cancelBtn?.addEventListener('click',()=>settle(false))
+    }
+    function requestBaseConfirmation(details){
+      if(!baseConfirmModal) return Promise.resolve(true)
+      baseConfirmNameEl && (baseConfirmNameEl.textContent = details.name)
+      baseConfirmBairroEl && (baseConfirmBairroEl.textContent = details.bairro)
+      baseConfirmEnderecoEl && (baseConfirmEnderecoEl.textContent = details.endereco)
+      baseConfirmModal.hidden = false
+      return new Promise(resolve=>{ baseConfirmResolver = resolve })
+    }
+
+    async function loadBairros(){
+      try{
+        const resp = await fetch(
+          `${API_URL}/localizacao/bairros`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': 'http://localhost:8080'
+            },
+            body: JSON.stringify({ login: usuarioLogin, token: authToken })
+          }
+        )
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        return data.map((b)=>({
+          id: Number(Object.keys(b)[0]),
+          name: b[Object.keys(b)[0]]
+        }))
+      }catch(err){
+        console.error('Erro ao carregar bairros', err)
+        return []
+      }
+    }
+
+    async function populateBairroSelect(){
+      const select = document.getElementById('baseNodeId')
+      if(!select) return
+      const bairros = await loadBairros()
+      select.innerHTML = '<option value="">Selecione o bairro</option>' +
+        bairros.map(b=>`<option value="${b.id}">${b.id} - ${b.name}</option>`).join('')
+    }
+
+    async function fetchBasesFromApi(){
+      try{
+        const resp = await fetch(
+          `${API_URL}/localizacao/bases`,{
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Access-Control-Allow-Origin':'http://localhost:8080'
+            },
+            body:JSON.stringify({ login: usuarioLogin, token: authToken })
+          }
+        )
+        const data = await resp.json()
+        if(!Array.isArray(data)) return []
+        return data.map(b=>({
+          baseId: b.id,
+          nodeId: b.bairro?.id || null,
+          name: b.nome || '',
+          bairroNome: b.bairro?.nomeBairro || '',
+          endereco: b.endereco || ''
+        }))
+      }catch(err){
+        console.error('Erro ao buscar bases na API', err)
+        return []
+      }
+    }
+
+    async function render(){
+      const apiBases = await fetchBasesFromApi()
+      writeBases(apiBases)
+      console.log('Bases carregadas da API:', apiBases)
+      const header = '<tr><th>Base ID</th><th>Bairro ID</th><th>Nome</th><th>Bairro</th><th>Endereço</th></tr>'
+      const body = apiBases.map(b=>`<tr><td>${b.baseId||''}</td><td>${b.nodeId||''}</td><td>${b.name||''}</td><td>${b.bairroNome||''}</td><td>${b.endereco||''}</td></tr>`).join('')
+      if(table) table.innerHTML = header+body
+    }
+
+    function toast(msg){
+      const t = document.getElementById('toast')
+      if(!t) return
+      t.textContent = msg
+      t.hidden = false
+      setTimeout(()=>{ t.hidden = true }, 1800)
+    }
+
+    if(form){
+      populateBairroSelect()
+      form.addEventListener('submit',async e=>{
         e.preventDefault()
         const err = document.getElementById('baseError')
         const name = document.getElementById('baseName')?.value||''
         const nodeIdStr = document.getElementById('baseNodeId')?.value||''
-        const availableStr = document.getElementById('baseAvailable')?.value||'true'
+        const endereco = document.getElementById('baseAddress')?.value||''
         const nodeId = Number(nodeIdStr)
-        const available = availableStr === 'true'
-        if(!name || !nodeId){ if(err) err.textContent = 'Preencha nome e Node ID.'; return }
+        if(!name || !nodeId || !endereco){ if(err) err.textContent = 'Preencha nome, bairro e endereço.'; return }
         if(err) err.textContent = ''
-        const list = readBases()
-        const idx = list.findIndex(b=>Number(b.nodeId)===nodeId)
-        const item = {nodeId, name, available}
-        if(idx>=0) list[idx] = item; else list.push(item)
-        writeBases(list)
-        render()
+
+        const bairroSelect = document.getElementById('baseNodeId')
+        const bairroLabel = bairroSelect && bairroSelect.selectedIndex >= 0
+          ? bairroSelect.options[bairroSelect.selectedIndex].textContent
+          : ''
+        const confirmed = await requestBaseConfirmation({
+          name,
+          bairro: bairroLabel || nodeId,
+          endereco
+        })
+        if(!confirmed) return
+
+        const url = `${API_URL}/localizacao/bases/criar?nomeBase=${encodeURIComponent(name)}&enderecoBase=${encodeURIComponent(endereco)}&idBairro=${encodeURIComponent(nodeId)}`
+        try{
+          const resp = await fetch(url,
+            {
+              method:'POST',
+              headers:  {
+              'Content-Type':'application/json',
+              'Access-Control-Allow-Origin':'http://localhost:8080'
+              },
+              body:JSON.stringify({ login: usuarioLogin, token: authToken })
+            })
+          if(!resp.ok){ throw new Error(`Status ${resp.status}`) }
+        }catch(apiErr){
+          console.error('Erro ao criar base', apiErr)
+          if(err) err.textContent = 'Falha ao salvar base no servidor.'
+          return
+        }
+
+        await render()
         toast('Base salva')
         form.reset()
       })
     }
+
     render()
   }
 })();

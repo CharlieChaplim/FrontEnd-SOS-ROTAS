@@ -9,21 +9,7 @@
 <body data-page="professionals">
   <header class="app-header">
     <h1>S.O.S. Rotas</h1>
-    <nav class="nav">
-      <button class="nav-toggle" id="navToggle">☰</button>
-      <div class="nav-links">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="ambulances.html">Ambulâncias</a>
-        <a href="occurrences.html">Ocorrências</a>
-        <a href="dispatch.html">Despacho</a>
-        <a href="history.html">Histórico</a>
-        <a href="professionals.html">Profissionais</a>
-        <a href="bases.html">Bases</a>
-        <a href="teams.html">Equipes</a>
-        <a href="users.html">Usuários</a>
-        <button id="logoutBtn">Sair</button>
-      </div>
-    </nav>
+    <div id="nav-placeholder"></div>
   </header>
   <main class="view">
     <div class="page">
@@ -33,9 +19,8 @@
           <option value="">Função</option>
           <option value="Condutor">Condutor</option>
           <option value="Enfermeiro">Enfermeiro</option>
-          <option value="Medico">Médico</option>
+          <option value="Médico">Médico</option>
         </select>
-        <select id="filterProfBase"></select>
         <select id="filterProfStatus">
           <option value="">Status</option>
           <option value="Ativo">Ativo</option>
@@ -53,14 +38,11 @@
               <select id="profRole">
                 <option value="Condutor">Condutor</option>
                 <option value="Enfermeiro">Enfermeiro</option>
-                <option value="Medico">Médico</option>
+                <option value="Médico">Médico</option>
               </select>
             </label>
             <label>Contato
               <input id="profContact" placeholder="Contato" />
-            </label>
-            <label>Base
-              <select id="profBase"></select>
             </label>
             <label>Status
               <select id="profStatus">
@@ -74,11 +56,48 @@
         </div>
         <div class="card">
           <h3>Lista</h3>
-          <table class="table" id="professionalTable"></table>
+            <div class="table-wrapper">
+              <table class="table" id="professionalTable" style="text-align: left;"></table>
+            </div>
         </div>
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>
+    <div id="professionalEditModal" class="modal-overlay" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+        <div class="modal-card-header">
+          <h3 id="editModalTitle">Editar profissional</h3>
+          <button type="button" class="icon-button" data-modal-action="close" aria-label="Fechar modal">×</button>
+        </div>
+        <form id="professionalEditForm" class="modal-form">
+          <label>Nome
+            <input id="editProfName" placeholder="Nome" />
+          </label>
+          <label>Função
+            <select id="editProfRole">
+              <option value="">Função</option>
+              <option value="Condutor">Condutor</option>
+              <option value="Enfermeiro">Enfermeiro</option>
+              <option value="Médico">Médico</option>
+            </select>
+          </label>
+          <label>Contato
+            <input id="editProfContact" placeholder="Contato" />
+          </label>
+          <label>Status
+            <select id="editProfStatus">
+              <option value="Ativo">Ativo</option>
+              <option value="Inativo">Inativo</option>
+            </select>
+          </label>
+          <div id="professionalEditError" class="error"></div>
+          <div class="modal-actions">
+            <button type="button" data-modal-action="close">Cancelar</button>
+            <button type="submit" class="forced-red-button">Confirmar</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </main>
   <script src="script.js"></script>
 </body>
